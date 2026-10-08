@@ -72,3 +72,8 @@ HOOKS: documented only (.claude/orchestration/hooks-plan.md), none enabled.
 BLOCKERS: none for Phase 1. Owner: review F-01..F-14, OD-005 timing, run interactive team test.
 NEXT PHASE: Stage A doc reconciliation (agents only), then APPLICATION FOUNDATION IMPLEMENTATION
   (BUILD_PLAN Phase 1 — Repository Foundation).
+VERIFICATION: final script 182 checks PASS, 0 FAIL (agents, settings, required files, placeholders,
+  ADR/OD + section + agent-name references, secret scan, no app code/weights, report headers).
+COMMIT HASH: e1b6e7d (chore: establish ClinNote autonomous multi-agent engineering system)
+PUSH: origin main 3a742bc..e1b6e7d — includes b1791e0 and e1961ef (previously unpushed docs).
+GIT STATUS AFTER PUSH: clean, main == origin/main (this hash line is recorded in a follow-up docs commit).
