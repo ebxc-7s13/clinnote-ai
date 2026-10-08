@@ -77,3 +77,21 @@ VERIFICATION: final script 182 checks PASS, 0 FAIL (agents, settings, required f
 COMMIT HASH: e1b6e7d (chore: establish ClinNote autonomous multi-agent engineering system)
 PUSH: origin main 3a742bc..e1b6e7d — includes b1791e0 and e1961ef (previously unpushed docs).
 GIT STATUS AFTER PUSH: clean, main == origin/main (this hash line is recorded in a follow-up docs commit).
+
+===== 2026-10-08T04:24:36Z — Stage A specification reconciliation + agent-team test (INCOMPLETE: usage limit) =====
+
+STATUS: INTERRUPTED by usage limit. NOT committed, NOT pushed (final verification not run).
+DONE (uncommitted, in working tree):
+  - F-01..F-14 resolutions drafted across DATA_MODEL (rewritten: provenance model, derivation lifecycle,
+    contradiction model, derived views, 4 new entities), AI, ARCHITECTURE, EVIDENCE-SOURCES, API_CATALOG,
+    PRODUCT_SPEC (Features 27-28), CLINICAL-SAFETY (CS-16a, CS-25..CS-31), TESTING (§13a corpus), BUILD_PLAN,
+    UI-UX (Screen 21), SECURITY, PRIVACY, DEPLOYMENT, GOOGLE-PLAY, SPEECH, CLAUDE.md, rules, agent files.
+  - DECISIONS: ADR-021..ADR-033; OD review: OD-003/004/005 resolved for planning, OD-008/009 resolved,
+    OD-001/002/006/007/010 open, OD-011 (target markets) added. OD-005 = engineering gate, NOT legal finding.
+  - Hooks enabled (.claude/settings.json): secret/model-download guard + TaskCreated/TaskCompleted gate;
+    17/17 hook unit tests PASS.
+  - REAL AGENT TEAM spawned in interactive tmux session (claude --agent chief-architect): teammates
+    @product @evidence @safety @backend; shared task list with Task D blocked by A/B/C observed;
+    Tasks A and B completed; C and E in progress when the lead session hit its own session limit.
+NOT DONE: team synthesis + messaging/plan-approval/QG-probe evidence, PROJECT-STATUS finding sections,
+  BUILD_REPORT, agent-doc updates, final cross-document audit, commit, push.

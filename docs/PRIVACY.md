@@ -23,7 +23,7 @@ This is a technical specification. It is not legal advice and not a public priva
 - Patient records live only on the clinician's device (ADR-005, ADR-017).
 - No cloud backup or sync in V1. The clinician is told that uninstalling the app or losing the device loses the data unless exported.
 - The backend stores no clinical content.
-- Encryption at rest per `SECURITY.md` §8 (OD-003).
+- Encryption at rest: SQLCipher with a Keystore-backed key (`SECURITY.md` §8, ADR-031).
 
 ## 4. Audio Handling
 
@@ -59,7 +59,7 @@ The clinician can turn off cloud AI features in Settings; ClinNote then works in
 |---|---|---|
 | Speech (OD-001) | audio stream | name, DOB, reference |
 | LLM (OD-002) | current-visit transcript, structured facts, evidence excerpts, age/sex if stored | name, DOB, reference, other visits' transcripts |
-| Evidence/terminology | clinical concept terms, drug names | any identifier, transcript text, dates, location |
+| Evidence/terminology | clinical concept terms, drug names; typed public product/record identifiers (RxCUI, set ID, NDC, application no., PMID, NCT, CID) taken from validated provider responses (ADR-036) | any patient identifier (name, DOB, reference, contact details), transcript text, dates, location |
 | Backend host | all of the above in transit | — (not persisted) |
 
 Third-party provider table (completed in BUILD_PLAN Phase 20 before production):
@@ -69,8 +69,9 @@ Third-party provider table (completed in BUILD_PLAN Phase 20 before production):
 | Speech provider (OD-001) | audio | transcription, diarization | VERIFY | VERIFY | in-app + privacy policy | VERIFY |
 | LLM provider (OD-002) | text, facts | AI jobs | VERIFY | VERIFY | in-app + privacy policy | VERIFY |
 | Evidence providers | concept queries | evidence | VERIFY | VERIFY | privacy policy | public API terms |
-| Supabase (backend) | in-transit requests | proxy, routing | VERIFY | not persisted by ClinNote | privacy policy | VERIFY |
-| Crash reporting (OD-009) | scrubbed technical data | stability | VERIFY | VERIFY | privacy policy | VERIFY |
+| Supabase (backend) | in-transit requests; non-clinical rate-limit counters keyed by an opaque user id (ADR-042) | proxy, routing, abuse control | VERIFY | clinical content not persisted; counters deleted after the longest window + 24 h and on account deletion | privacy policy + Data Safety (account/app-activity data) | VERIFY |
+| Supabase Auth (ADR-032) | clinician email and auth tokens (no patient data) | clinician sign-in, abuse control | VERIFY | VERIFY | privacy policy + Data Safety | VERIFY |
+| Crash reporting | none: no SDK in V1 (ADR-030); Google Play Android vitals only | stability | Google | per Play terms (VERIFY) | privacy policy | Play developer terms |
 
 ## 8. Analytics
 
@@ -78,7 +79,7 @@ V1 ships with no product analytics. If analytics are added later (ADR required),
 
 ## 9. Crash Reporting
 
-Only scrubbed technical data (`SECURITY.md` §17). No clinical content.
+V1 has no crash-reporting SDK (ADR-030). Only Google Play Android vitals collects crash data (VERIFY exact fields). No clinical content is ever sent.
 
 ## 10. Retention
 

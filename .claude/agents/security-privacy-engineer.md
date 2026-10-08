@@ -19,7 +19,7 @@ Read `CLAUDE.md`, `docs/PROJECT-STATUS.md`, `docs/SECURITY.md` (all, especially 
 - `docs/SECURITY.md`, `docs/PRIVACY.md`
 - secret-scanning and dependency-audit configuration (with devops-android-release-engineer for CI wiring)
 - security/privacy reviews written to `docs/agent-handoffs/` (review files)
-- OD-003 (local encryption) recommendation, OD-004 (backend auth) recommendation, OD-009 (crash reporting) recommendation — final decisions by project owner via chief-architect
+- verification of the planning decisions ADR-031 (SQLCipher encryption), ADR-032 (Supabase Auth clinician accounts) and ADR-030 (no crash SDK in V1). Any change needs an ADR and project-owner approval
 
 ## Review checklist (every feature with patient data)
 

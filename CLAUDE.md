@@ -154,7 +154,15 @@ Review status — whether a clinician accepted it:
 
 Never conflate them.
 
+The authoritative provenance model, fact derivation lifecycle and contradiction model are in `docs/DATA_MODEL.md` §3.2, §8 and §9 (ADR-021, ADR-022):
+- deterministic code assigns provenance from the clinician-confirmed speaker role, never the AI model
+- every fact keeps an immutable originProvenance
+- AI never assigns MEASURED or CLINICIAN_CONFIRMED
+- contradictory statements are both kept and flagged; neither is silently overwritten
+
 Present "Possibilities to review", never automatic diagnoses. No autonomous diagnosis, prescribing, dosage changes or triage.
+
+Possibilities to review are regulatory tier R2 (ADR-025): they sit behind a default-off flag and are not released before a formal regulatory assessment. R3 diagnostic, treatment or prescribing functionality is prohibited. This is an engineering gate, not a legal conclusion.
 
 ## 7. Privacy
 

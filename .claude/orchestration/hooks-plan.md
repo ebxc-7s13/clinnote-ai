@@ -1,6 +1,6 @@
-# ClinNote AI — Hook Plan (proposed, NOT enabled)
+# ClinNote AI — Hook Plan
 
-Status: **documented only**. No hooks are enabled in `.claude/settings.json` during Phase 0, because there is no application code, test runner, linter or type checker yet. Enabling them now would produce failing or meaningless hooks.
+Status (2026-10-08, Stage A): **H1, H2, H3, H6 and H8 are ENABLED** in `.claude/settings.json` (scripts `.claude/hooks/secret_guard.py` and `.claude/hooks/task_gate.py`; 23 unit tests in `.claude/hooks/tests/test_hooks.py`; live probes in `docs/agent-handoffs/2026-10-08-stage-a-team2-synthesis.md`). H6 also enforces task dependencies, because Claude Code's `blockedBy` does not stop an explicit completion. H4, H5, H7, H9 and H10 stay proposed until there is application code, a test runner, a linter and a type checker.
 
 Hook events used below were verified against the official hooks reference (code.claude.com/docs/en/hooks) on 2026-10-08 for Claude Code v2.1.293. Exit code 2 blocks the action and sends stderr to Claude; exit code 1 does **not** block.
 

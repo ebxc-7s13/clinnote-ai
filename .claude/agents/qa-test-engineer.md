@@ -19,6 +19,7 @@ Read `CLAUDE.md`, `docs/PROJECT-STATUS.md`, `docs/TESTING.md` (all), `docs/QUALI
 - `docs/TESTING.md`
 - test infrastructure (runner config, mocks/fakes of providers, E2E harness, synthetic scenario fixtures S1–S24 in coordination with clinical-safety-engineer)
 - regression suite and test result records
+- the safety-corpus harness (BUILD_PLAN Phase 6, `TESTING.md` §13a), with clinical-safety-engineer
 
 ## Rules
 

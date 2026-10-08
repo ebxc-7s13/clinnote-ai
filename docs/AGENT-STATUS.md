@@ -1,38 +1,44 @@
 # ClinNote AI — Agent Status Dashboard
 
-Last updated: 2026-10-08 (Phase 0 — Multi-Agent System Initialization).
+Last updated: 2026-10-08 (Stage A resume session — specification reconciliation completed; staged agent re-validation).
 
-**Discovered** means a fresh Claude Code v2.1.293 session listed the agent type through its Agent tool (`claude -p`, 2026-10-08T03:42Z, result: 14/14).
-**Tested** means the agent was actually invoked during the dry run (2026-10-08T03:43:05Z–03:50:22Z) and produced the required output.
+Definitions:
+- **Discovered:** a Claude Code session listed the agent type through its Agent tool (Phase 0: 14/14 in a fresh `claude -p` session, v2.1.293; Stage A: 14/14 in the interactive lead session, v2.1.294).
+- **Tested:** the agent actually ran and produced the required output. The evidence is listed in the table.
 
-| Agent | Created | Discovered | Tested | Role |
+| Agent | Created | Discovered | Tested | Evidence |
 |---|---|---|---|---|
-| chief-architect | YES | YES | YES (main session via `--agent`; created 4 tasks with dependencies, delegated 3 in parallel, SendMessage, synthesis handoff) | Orchestrator / lead |
-| product-clinical-architect | YES | YES | YES (dry-run handoff, 78 lines) | Product + clinical workflow |
-| mobile-android-engineer | YES | YES | NO (no app code in Phase 0) | Expo/React Native Android app |
-| backend-api-engineer | YES | YES | NO | Serverless backend |
-| speech-diarization-engineer | YES | YES | NO | Recording, STT, diarization |
-| ai-clinical-engineer | YES | YES | NO | Clinical AI jobs |
-| evidence-research-engineer | YES | YES | YES (dry-run handoff, 106 lines) | Evidence + API verification |
-| data-engineer | YES | YES | NO | Domain model + SQLite |
-| security-privacy-engineer | YES | YES | NO | Security/privacy review |
-| clinical-safety-engineer | YES | YES | YES (dry-run handoff, 84 lines; resumed via SendMessage and replied) | Clinical safety validation |
-| qa-test-engineer | YES | YES | NO | Test automation |
-| devops-android-release-engineer | YES | YES | NO | CI, builds, Play release |
-| ux-accessibility-engineer | YES | YES | NO | UX + accessibility |
-| integration-reviewer | YES | YES | NO | Cross-layer / release review |
+| chief-architect | YES | YES | YES | Phase 0 dry run (lead via `--agent`). Stage A run 2: lead of team `session-b983a4a0` (task list, dependency test, plan review). Resume session: lead (staged reviews, ADR-044/045, Task D synthesis `2026-10-08-stage-a-team2-synthesis.md`) |
+| product-clinical-architect | YES | YES | YES | dry run; Stage A runs 1 and 2; resume Task A2 (`2026-10-08-stage-a-resume-product.md`) |
+| mobile-android-engineer | YES | YES | NO | no app code yet |
+| backend-api-engineer | YES | YES | YES | Stage A run 2 teammate `backend`: plan v1 rejected, v2 approved; contract review (`2026-10-08-stage-a-team2-backend.md`) |
+| speech-diarization-engineer | YES | YES | NO | — |
+| ai-clinical-engineer | YES | YES | NO | — |
+| evidence-research-engineer | YES | YES | YES | dry run; Stage A runs 1 and 2; resume Task B2 (`2026-10-08-stage-a-resume-evidence.md`) |
+| data-engineer | YES | YES | NO | — |
+| security-privacy-engineer | YES | YES | NO | (hooks authored under chief-architect approval; review pending in Phase 1) |
+| clinical-safety-engineer | YES | YES | YES | dry run; Stage A runs 1 and 2; resume Task C2 with 7 addenda and the final Gate 6 documentation verdict PASS (`2026-10-08-stage-a-resume-safety.md`) |
+| qa-test-engineer | YES | YES | NO | — |
+| devops-android-release-engineer | YES | YES | NO | — |
+| ux-accessibility-engineer | YES | YES | NO | — |
+| integration-reviewer | YES | YES | NO | — |
 
-Totals: created 14 · discovered 14 · tested 4 (1 lead + 3 specialists).
+Totals: created 14 · discovered 14 · tested 5 (1 lead + 4 teammates).
 
-## Capability Status
+## Capability Status (Stage A, Claude Code v2.1.294, 2026-10-08)
+
+Run-2 rows marked † come from the run-2 lead's report. Their raw probe output was kept only in a session scratchpad and is not preserved. Resume-session evidence is in `2026-10-08-stage-a-team2-synthesis.md` §5 and Tests.
 
 | Capability | Status | Evidence |
 |---|---|---|
-| Agent discovery | TESTED, PASS | 14/14 listed by a fresh session; the dry-run lead also listed 14 |
-| Delegation (subagents) | TESTED, PASS | 3 Agent calls with the correct subagent_type; agentIds recorded in the dry-run handoff |
-| Parallel execution | TESTED, PASS | One spawn block; run times overlap (~212 s wall vs 504 s summed) |
-| Messaging (SendMessage, lead → subagent resume) | TESTED, PASS | `{"success":true,"message":"Resuming agent safety-dryrun"}`; reply quoted |
-| Task list with dependencies | TESTED, PASS | TaskCreate available in the `-p --agent` session; task #4 blockedBy #1–#3; all completed |
-| Handoff files | TESTED, PASS | 4 dry-run handoffs in the required format |
-| Agent teams (teammates, peer-to-peer messaging) | ENABLED, NOT TESTED | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in `.claude/settings.json`. Teammates require an interactive session (`claude --agent chief-architect`). The setup session's Agent tool has no teammate `name` parameter, and `-p` sessions cannot spawn teammates. |
-| Hooks | DOCUMENTED, NOT ENABLED | `.claude/orchestration/hooks-plan.md` |
+| Agent-team spawning (real teammates) | TESTED, PASS | 4 teammates in `~/.claude/teams/session-b983a4a0/config.json` with backendType `in-process` and agentType = project definition |
+| Direct teammate ↔ teammate messaging | TESTED, PASS | Run 2†: product→evidence, evidence→safety, safety→product (recorded in the run-2 handoffs). Resume: evidence→safety with reply, product→evidence with reply (Messages tables in the resume handoffs) |
+| Shared task list | TESTED, PASS | Run 2†: lead only. Resume session: teammates `evidence` and `product` completed their own tasks (#2, #3) through TaskUpdate, passing the TaskCompleted hook |
+| Task dependencies | TESTED, PASS (with hook) | Resume session: native `blockedBy` did not stop an explicit completion. The hook also skipped the check because the team task list lives in a differently named directory, so the dependent probe completed. After the fix (subject-matched fallback, regression test), the probe was blocked: "depends on unfinished task(s) #9 (pending)" |
+| Plan approval | TESTED, PASS (message protocol, run 2) | backend plan v1 REJECTED with 3 specific gaps; v2 APPROVED. Native plan mode auto-approves without lead review (official docs), so it is not used as a review gate |
+| Quality-gate hooks | TESTED, PASS | 23/23 unit tests. Live probes re-run in the resume session: an ownerless task was rejected at creation; a task missing tests and a safety-sensitive task without review were blocked at completion; the dependency probe was blocked after the fix. Credential exposure is covered by unit tests. A handoff missing `## Evidence` was blocked (evidence task #2) until the section was added. The handoff path bug (cwd-relative) is fixed |
+| File-conflict prevention | DOCUMENTED, PROCEDURAL | No file locking exists in Claude Code. `AGENT-OWNERSHIP.md` §4a: single writer, owned paths, worktrees. In Stage A, teammates edited only their own handoff files (verified by `git status`) |
+| Handoffs | TESTED, PASS | 4 run-2 handoffs + re-check files in TEMPLATE format; the backend handoff has all required sections and passed the TaskCompleted hook |
+| Hook turn-end behavior | OBSERVED | TaskCompleted also fires when a teammate's turn ends while it owns an in-progress task. A blocked completion re-fired 9 times while the teammate waited; mitigated by keeping waiting tasks pending (`AGENT-SYSTEM.md` §12) |
+| Agent release | TESTED, PASS | Resume session: shutdown_request → shutdown_approved for safety, evidence and product |
+| Session limits | OBSERVED | Run 1 and run 2: the lead or teammates hit session limits. Resume session (staged, at most two teammates active at once): no limit reached |

@@ -21,7 +21,9 @@ Read `CLAUDE.md`, `docs/PROJECT-STATUS.md`, `docs/ARCHITECTURE.md` (§3.5 backen
 ## Must ensure
 
 - Private keys (`*_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) exist only in the backend secret store; never returned to the client, never logged, never committed.
-- Every endpoint authenticates (OD-004 mechanism), validates size/type/enum/ID/string/date/number, rate-limits per client and globally.
+- Every endpoint authenticates the clinician (Supabase Auth JWT, ADR-032), validates size, type, enum, ID, string, date and number, and rate-limits per user and globally.
+- The backend foundation is built in Phase 7 (task group 7B, ADR-026), independent of the speech-provider decision.
+- No response cache on the backend (ADR-028).
 - Provider responses are schema-validated; unexpected shapes become provider errors.
 - No persistence of transcripts, facts, notes, audio or patient-linked queries; no request/response body logging.
 - Evidence queries contain clinical concepts only — reject identifiers.

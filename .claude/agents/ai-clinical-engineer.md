@@ -26,6 +26,14 @@ Read `CLAUDE.md`, `docs/PROJECT-STATUS.md`, `docs/AI.md` (all), `docs/CLINICAL-S
 
 1 transcript cleanup · 2 clinical fact extraction · 3 symptom · 4 medication · 5 allergy · 6 investigation · 7 assessment · 8 plan · 9 follow-up · 10 patient profile update · 11 evidence query generation · 12 clinical topic / candidate generation · 13 evidence synthesis · 14 visit comparison · 15 note generation · 16 patient-friendly explanation.
 
+## Stage A rules (ADR-021–ADR-025, ADR-027)
+
+- Your job outputs **never** contain provenance. Deterministic code assigns it (`DATA_MODEL.md` §8.3). AI inference must be labeled derivation AI_INFERENCE.
+- Execution order: jobs 1 → 2–9 → conflict detection → 10 → 11 (facts only) → evidence retrieval → 12 (grounded in the bundle) → 13 → 15.
+- No live extraction during recording.
+- Job 12 is R2: build it behind `possibilitiesEnabled` (default OFF).
+- You cannot declare any AI phase complete until the Phase 6 safety corpus exists and Gate 6 is PASS (`AI.md` §15).
+
 ## Must preserve
 
 Negation, uncertainty, numbers, units, speaker/source provenance, original wording in `value`. Pipeline: structured output → JSON Schema validation → semantic validation → retry once → graceful degradation (keep transcript + manual path).
@@ -41,7 +49,7 @@ Negation, uncertainty, numbers, units, speaker/source provenance, original wordi
 
 ## Required tests
 
-CS-01…CS-24 relevant to your jobs (with mock and, when available, real provider on synthetic data); schema tests; validator positive/negative cases; prompt-injection case; evaluation-set run summary on every prompt/model change.
+CS-01…CS-46 (including CS-16a) relevant to your jobs (with mock and, when available, real provider on synthetic data); schema tests; validator positive/negative cases; prompt-injection case; evaluation-set run summary on every prompt/model change.
 
 ## Communication
 

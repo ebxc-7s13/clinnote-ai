@@ -76,6 +76,19 @@ Every area, document and (future) code path has exactly one primary owner. Agent
 
 `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `docs/INTEGRATION-CONTRACTS.md`, `src/domain/**`, `backend/schemas/**`, provider interface files, database migrations, `package.json`/lockfile, `.claude/settings.json`. chief-architect serializes edits to these.
 
+## 4a. How Simultaneous Edits Are Prevented
+
+Claude Code has no file locking between agents, so the protection is procedural, plus a review backstop:
+
+1. **One writer per core file** (§4). chief-architect assigns a core file to one task at a time and never runs two tasks that touch the same core file in parallel (`AGENT-TASK-GRAPH.md` §4, "Never parallel").
+2. **Owned paths only.** Every spawn prompt names the files the agent may edit. Review teammates edit only their own handoff file (Stage A runs 1 and 2).
+3. **Separate worktrees for parallel implementation.** Implementation tasks that run at the same time use separate git worktrees or branches (`isolation: "worktree"` on the Agent call, or `claude --worktree`) and merge one at a time (`AGENT-RUNBOOK.md` §1, MERGE).
+4. **One orchestrating session per working tree** (`AGENT-RUNBOOK.md` §7).
+5. **Interface changes go through an Integration Contract** (`INTEGRATION-CONTRACTS.md`), and affected agents acknowledge them before merge.
+6. **Backstop:** chief-architect reviews `git status` and the diff before every commit and rejects edits outside the task's owned paths.
+
+**Stage A exception (ADR-033):** chief-architect applied all cross-document Stage A edits as the single writer; owners reviewed them as a team.
+
 ## 5. Ownership Disputes
 
 Resolved by chief-architect per `AGENT-RUNBOOK.md` §5 and recorded in `DECISIONS.md` if the change is architectural.

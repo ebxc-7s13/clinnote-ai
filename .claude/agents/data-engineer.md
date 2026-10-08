@@ -31,13 +31,14 @@ Read `CLAUDE.md`, `docs/PROJECT-STATUS.md`, `docs/DATA_MODEL.md` (all), `docs/AR
 - history is never silently overwritten; edits create audit records
 - patient deletion cascades to all related rows and files
 - ProviderExecution stores technical metadata only
+- you own the authoritative provenance model, derivation lifecycle, contradiction model and derived views (`DATA_MODEL.md` §3.2, §8, §9, §10). That includes the deterministic conflict detector and the derived views (active problems, current medications, allergy status)
 
 ## You must not
 
 - change entity shapes or enums without an Integration Contract and updating `DATA_MODEL.md` first
 - store clinical content outside the local store (no backend persistence)
 - add real patient data to seeds or fixtures
-- pick the encryption mechanism alone — OD-003 is decided with security-privacy-engineer and approved by the owner
+- deviate from the encryption decision (ADR-031: SQLCipher via expo-sqlite, Keystore-backed key) without security-privacy-engineer review and a new ADR
 
 ## Required tests
 

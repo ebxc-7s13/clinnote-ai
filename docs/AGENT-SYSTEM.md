@@ -35,7 +35,7 @@ The cost is coordination overhead and more tokens. The chief-architect activates
 | 13 | ux-accessibility-engineer | sonnet | UX specification, accessibility, design review | Read, Grep, Glob, Write/Edit (UX docs) |
 | 14 | integration-reviewer | opus | Cross-layer and release-readiness review | Read, Grep, Glob, Bash, Write (reviews) |
 
-Only chief-architect has the `Agent` tool, so only it delegates. Specialists communicate with `SendMessage`. In an agent team, Claude Code adds `SendMessage` and the Task tools to in-process teammates automatically.
+Only chief-architect has the `Agent` tool, so only it delegates. Specialists communicate with `SendMessage`. In an agent team, Claude Code adds `SendMessage` to in-process teammates automatically, and adds the Task tools only when the lead session has them. On current models that requires `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` (ADR-037, set in project settings).
 
 Definitions: `.claude/agents/<name>.md`.
 
@@ -45,7 +45,7 @@ One primary owner per area, document and code path. See `AGENT-OWNERSHIP.md`. Co
 
 ## 4. Dependencies
 
-The phase graph, critical path and safe parallel sets are in `AGENT-TASK-GRAPH.md`. Owner decisions on the critical path are OD-007, OD-001, OD-004, OD-002, OD-005, OD-003, OD-006 and OD-010 (`DECISIONS.md`).
+The phase graph, critical path and safe parallel sets are in `AGENT-TASK-GRAPH.md`. Owner decisions still open on the critical path are OD-007, OD-001, OD-002, OD-011, OD-006 and OD-010, plus the formal regulatory assessment required by ADR-025 (`DECISIONS.md`). OD-003, OD-004, OD-005, OD-008 and OD-009 were resolved in Stage A.
 
 ## 5. Communication
 
@@ -82,7 +82,7 @@ There are ten gates: Architecture, Data model, API contracts, Feature implementa
 
 ## 9. Escalation
 
-Specialist → specialist (message) → chief-architect (conflict resolution, `AGENT-RUNBOOK.md` §5) → project owner. The project owner handles credentials, accounts, legal and regulatory questions (OD-005, OD-006), licensing (OD-010), provider selection approvals, and the final release decision.
+Specialist → specialist (message) → chief-architect (conflict resolution, `AGENT-RUNBOOK.md` §5) → project owner. The project owner handles credentials, accounts, legal and regulatory questions (the ADR-025 formal assessment, OD-006, OD-011), licensing (OD-010), provider selection approvals, and the final release decision.
 
 ## 10. Handoff
 
@@ -98,20 +98,25 @@ Phases 23–25: devops builds a signed AAB → QA runs device tests → security
 |---|---|---|
 | Project subagents | `.claude/agents/*.md` (14) | Created; a fresh session discovered all 14 (see BUILD_REPORT) |
 | Project rules | `.claude/rules/*.md` (7, always loaded) | Created |
-| Agent teams | `.claude/settings.json` → `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"` | Enabled (experimental, ADR-020) |
-| Hooks | `.claude/orchestration/hooks-plan.md` | Documented, **not enabled** |
-| Lead session | `claude --agent chief-architect` (interactive, for teams) | Documented |
+| Agent teams | `.claude/settings.json` → `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"` | Enabled (experimental, ADR-020); real team spawned and tested in Stage A run 2 |
+| Task tools | `.claude/settings.json` → `env.CLAUDE_CODE_ENABLE_TODO_TOOLS = "1"` | Enabled (ADR-037); without it, current models have no shared task list and the task hooks never fire |
+| Hooks | `.claude/settings.json` `hooks` → `.claude/hooks/secret_guard.py` (PreToolUse), `.claude/hooks/task_gate.py` (TaskCreated, TaskCompleted) | **Enabled**, read-only, 23 unit tests (`QUALITY-GATES.md` "Enforcement Mechanism") |
+| Lead session | an interactive session running as chief-architect (`claude --agent chief-architect`, or the main session following `.claude/agents/chief-architect.md`) | Tested in Stage A run 2 |
 
 ### How to run
 
-- **Full team (recommended for multi-layer phases):** start an interactive session with `claude --agent chief-architect`. Then ask it to execute the next BUILD_PLAN phase with an agent team. Teammates can only be spawned from an interactive session, and only the lead manages the team.
+- **Full team (recommended for multi-layer phases):** start an interactive session with `claude --agent chief-architect`. Then ask it to execute the next BUILD_PLAN phase with an agent team. The lead spawns a teammate by calling the Agent tool with a `name` and the project agent type (`subagent_type`); with agent teams enabled, a named spawn becomes a teammate (it appears in `~/.claude/teams/session-<id>/config.json` with its agent type). Teammates can only be spawned from an interactive session, and only the lead manages the team.
 - **Subagent mode (fallback):** use any session, interactive or `claude -p`. chief-architect, or the main session, delegates to the specialists with the Agent tool and relays messages with SendMessage. Coordination happens through handoff files and the Active Task Board (`AGENT-TASK-GRAPH.md` §6).
 
-### Known platform limitations (Claude Code v2.1.293, verified 2026-10-08)
+### Known platform limitations (Claude Code v2.1.294, official docs re-read 2026-10-08)
 
-- Agent teams are experimental. Teammates can't be restored after `/resume`. Task status can lag, and there is one team per session.
+- Agent teams are experimental. In-process teammates can't be restored after `/resume`. Task status can lag, and there is one team per session, named `session-<first 8 chars of session ID>`. There is no TeamCreate/TeamDelete step: the team exists implicitly per session, and its config directory is removed when the session ends (the task list persists).
 - Teammates cannot spawn teammates. Only the lead manages the team.
 - Non-interactive (`-p`) sessions cannot spawn teammates.
+- **`blockedBy` stops teammates from claiming a blocked task, but it does not stop an explicit `TaskUpdate` from completing it** (observed in Stage A). The TaskCompleted hook therefore enforces dependencies (`QUALITY-GATES.md`).
+- **TaskCompleted also fires when a teammate's turn ends while it owns an in-progress task.** If the hook blocks (exit 2), for example because the handoff is not written yet, the teammate is pushed to keep working on every turn end. In Stage A run 2 this blocked one teammate nine times while it was waiting for plan approval. Rule: a task is set to in_progress only by the agent that will complete it in the same turn. A teammate that is waiting (for approval or a reply) keeps the task pending.
+- **Native plan approval is automatic.** A teammate spawned while the lead is in plan mode sends a plan approval request, and Claude Code approves it in the lead session without lead review. Lead-reviewed approval therefore uses the message protocol in `AGENT-RUNBOOK.md` §9.
+- The Task tools are absent on current models unless the session opts in (ADR-037). Enabling them mid-session gave them to the lead but not to teammates spawned afterwards (Stage A run 2). Start the lead session with the setting already in place. If teammates still lack the tools, the lead claims and completes tasks on their behalf, and the hooks still validate every completion.
 - A session only watches agent directories that existed when it started. If `.claude/agents/` is created during a session, that session must be restarted to see the agents.
 
 ## 13. Terminal Report

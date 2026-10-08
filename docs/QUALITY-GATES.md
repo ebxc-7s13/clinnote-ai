@@ -41,7 +41,7 @@ Gates are evaluated by their gate owner with evidence and accepted by chief-arch
 ### Gate 6 — Clinical Safety (release-blocking)
 
 - **Owner:** clinical-safety-engineer
-- **Pass criteria:** all applicable CS-01…CS-24 tests pass; no diagnosis/prescribing/dose/probability output; NOT_DISCUSSED never rendered as negative/normal; citations only from provider responses; review of AI/evidence/data changes completed.
+- **Pass criteria:** all applicable CS-01…CS-46 tests (including CS-16a) pass, and a **pending test never counts as passing**; the phase's safety corpus cases exist (`TESTING.md` §13a); with `possibilitiesEnabled` OFF no R2 job runs (CS-37); no diagnosis/prescribing/dose/probability output; NOT_DISCUSSED never rendered as negative/normal; citations only from provider responses; review of AI/evidence/data changes completed.
 - **Evidence:** safety suite output (command, counts), review file.
 
 ### Gate 7 — Security / Privacy (release-blocking)
@@ -65,8 +65,40 @@ Gates are evaluated by their gate owner with evidence and accepted by chief-arch
 ### Gate 10 — Play Store Readiness
 
 - **Owner:** devops-android-release-engineer; **reviewers:** security-privacy-engineer, clinical-safety-engineer, qa-test-engineer
-- **Pass criteria:** `GOOGLE-PLAY.md` §16 checklist complete with evidence; policies re-checked on submission date; no prohibited claims; OD-005, OD-006, OD-010 resolved.
+- **Pass criteria:** `GOOGLE-PLAY.md` §16 checklist complete with evidence; policies re-checked on submission date; no prohibited claims; the formal regulatory assessment required by ADR-025 (OD-005 engineering gate) documented for each target market; OD-006, OD-010 and OD-011 resolved; release build has `possibilitiesEnabled` OFF unless that assessment permits R2.
 - **Evidence:** checklist with dates and links.
+
+## Enforcement Mechanism (hooks, enabled Stage A)
+
+The gates are enforced partly by people (reviewers) and partly by **read-only Claude Code hooks** configured in `.claude/settings.json`. The hooks never modify or delete anything. They only allow (exit 0) or block with a reason (exit 2), as described in the official hooks reference.
+
+| Hook | Event | Script | Enforces |
+|---|---|---|---|
+| H1–H3 | PreToolUse (`Write\|Edit\|Bash`) | `.claude/hooks/secret_guard.py` | blocks writing secrets, `.env` files, staged secrets on `git commit`/`push`, and model-weight or ML-framework downloads (Gate 7, ADR-003) |
+| H8 | TaskCreated | `.claude/hooks/task_gate.py` | every task names an `Owner:` that is a ClinNote agent or `project-owner` |
+| H6 | TaskCompleted | `.claude/hooks/task_gate.py` | the tag rules below (Gates 4, 6, 7, 8), and **task dependencies**: completion is blocked while any `blockedBy` task is unfinished. Claude Code's own `blockedBy` only prevents claiming (Stage A finding). The hook reads the session task list read-only |
+
+Hook tests: `python3 -I .claude/hooks/tests/test_hooks.py` (23 tests). Live probes (an ownerless task, a missing-tests task, a safety-sensitive task without review, and a dependency) were re-run in the Stage A resume session and are recorded in `docs/agent-handoffs/2026-10-08-stage-a-team2-synthesis.md` §5 and Tests. Run-2 probe output was not preserved. Credential exposure in handoffs is covered by the unit tests.
+
+### Task tags
+
+Each tag goes on its own line in the task description.
+
+| Tag | Meaning | Enforced at completion |
+|---|---|---|
+| `Owner: <agent-name>` | responsible agent | required at creation |
+| `Handoff: docs/agent-handoffs/<file>.md` | handoff file for the task | file must exist with non-empty `## Tests`, `## Evidence` and `## Receiving Agent` sections, and must contain no credential |
+| `Tests-required: yes\|no` | the task changes behavior | `yes` → `## Tests` must contain test commands with result counts. A task without tests is **not release-complete** |
+| `Safety-sensitive: yes\|no` | the task touches clinical data, AI, evidence, provenance or notes | `yes` → the handoff must contain `Safety review: PASS` (from clinical-safety-engineer) |
+| `Security-sensitive: yes\|no` | the task touches secrets, auth, network, storage, logging or exports | `yes` → the handoff must contain `Security review: PASS` (from security-privacy-engineer) |
+
+A gated task without a `Handoff:` line cannot be completed. Credential exposure in a handoff always fails.
+
+### Scope of hook enforcement
+
+The hooks are a backstop, not the whole gate. Reviewers still assess quality, and chief-architect still accepts each gate on evidence.
+
+TaskCreated and TaskCompleted fire only for the shared task list (agent teams, or sessions with the Task tools). PreToolUse fires for every session that loads the project settings.
 
 ## Gate Order per Phase
 
@@ -87,4 +119,4 @@ Phase 0 — documentation and agent system only. No application exists, so imple
 | 7 Security/privacy | BLOCKED | Requirements documented only |
 | 8 Testing | BLOCKED | No test suite yet |
 | 9 Android build | BLOCKED | No app |
-| 10 Play Store readiness | BLOCKED | No app; OD-005/006/010 open |
+| 10 Play Store readiness | BLOCKED | No app; ADR-025 formal assessment not yet performed; OD-006/010/011 open |

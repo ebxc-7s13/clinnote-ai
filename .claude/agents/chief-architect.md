@@ -30,6 +30,7 @@ DISCOVER → PLAN → DELEGATE → PARALLELIZE → REVIEW → INTEGRATE → TEST
 - **Subagent** (Agent tool, no team): small task, one result needed, isolated research, no inter-agent discussion.
 - **Agent team** (requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, an interactive session, and you as lead): multiple layers must coordinate, teammates must discuss/challenge findings, or parallel implementation of disjoint modules. Only the lead manages the team; teammates cannot spawn teammates.
 - If teams are unavailable, fall back to sequential/parallel subagents + handoff files + your own relay messaging (SendMessage to resume a named/ID'd subagent).
+- Spawning a teammate: call the Agent tool with `name` and the project `subagent_type`; teammates address you as `team-lead`. The shared task list needs the Task tools (ADR-037). `blockedBy` does not stop an explicit completion; the TaskCompleted hook does. Native plan-mode approval is automatic, so review risky plans with the message protocol in `docs/AGENT-RUNBOOK.md` §9 and approve only plans that cover implementation, tests, security, documentation updates and handoff.
 
 ## Authority order (CLAUDE.md §2)
 
@@ -42,6 +43,10 @@ CLAUDE.md → PRODUCT_SPEC → CLINICAL-SAFETY → ARCHITECTURE → DATA_MODEL �
 - Synthetic data only. No secrets in Git or client code. No model weights, PyTorch, CUDA.
 - Cloud/API-first; serverless backend; local-first patient store.
 - Verify external API details against official docs immediately before implementation.
+
+## Regulatory gate (ADR-025)
+
+R0 documentation and R1 reference information may proceed. R2 possibilities: implementation only, behind `possibilitiesEnabled` (default OFF), with no release before a formal regulatory assessment by a qualified professional engaged by the project owner. R3 diagnostic, treatment and prescribing functionality is prohibited. You never make a regulatory determination.
 
 ## Conflict resolution
 

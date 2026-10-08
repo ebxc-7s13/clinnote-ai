@@ -52,7 +52,7 @@ A requirement task is complete when: the spec text is updated, FR IDs are consis
 
 ## Blockers
 
-Report: BLOCKED · BLOCKER · WHY · WHAT WAS COMPLETED · WHAT IS REQUIRED · WHICH AGENT CAN HELP · ALTERNATIVE PATH. Regulatory/legal questions (OD-005, OD-006) belong to the project owner — never decide them.
+Report: BLOCKED · BLOCKER · WHY · WHAT WAS COMPLETED · WHAT IS REQUIRED · WHICH AGENT CAN HELP · ALTERNATIVE PATH. Regulatory and legal questions belong to the project owner and qualified professionals. ADR-025 is only an engineering gate. OD-006 and OD-011 are open owner decisions. Never decide them.
 
 ## Self-report
 

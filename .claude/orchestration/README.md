@@ -6,7 +6,7 @@ This directory holds the operational configuration that the chief-architect uses
 |---|---|
 | `team-stages.md` | Development stages A–F, which agents are active in each, concurrency limits, subagent-vs-team choice |
 | `spawn-prompts.md` | Reusable, self-contained spawn prompt templates for each agent and for teams |
-| `hooks-plan.md` | Proposed hooks (documented, **not enabled**) and the conditions for enabling them |
+| `hooks-plan.md` | Hook plan: H1–H3, H6 and H8 enabled (Stage A); the rest proposed, with the conditions for enabling them |
 
 Related configuration:
 
@@ -28,4 +28,4 @@ Non-interactive (`claude -p`) sessions can delegate to subagents but **cannot sp
 
 ## Version note
 
-Configuration verified against Claude Code v2.1.293 and the official docs at code.claude.com (sub-agents, agent-teams, hooks, memory) on 2026-10-08. Re-verify after Claude Code upgrades, because agent teams are experimental.
+Configuration verified against Claude Code v2.1.293 and the official docs at code.claude.com (sub-agents, agent-teams, hooks, memory) on 2026-10-08, and re-verified against v2.1.294 (agent-teams, hooks, tools-reference) in Stage A on the same date. Re-verify after Claude Code upgrades, because agent teams are experimental.

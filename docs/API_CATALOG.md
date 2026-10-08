@@ -17,8 +17,10 @@ No provider listed here has been verified yet. Values marked `VERIFY BEFORE IMPL
 - No API keys or provider accounts exist yet. Credential variables listed below are the names the backend will use once the project owner creates them.
 - Every provider sits behind an interface (ADR-004, `ARCHITECTURE.md` §3.6).
 - Do not call every provider on every request; use the routing table (§29).
-- Never send patient identifiers to evidence providers. Evidence queries contain clinical concepts only.
+- Never send patient identifiers to evidence providers. Evidence queries contain clinical concepts, plus — only where an endpoint needs them — typed public product/record identifiers (RxCUI, set ID, NDC, application number, PMID, NCT, CID) whose values came from a stored, validated provider response (ADR-036).
 - Every call creates a `ProviderExecution` record with technical metadata only (`DATA_MODEL.md`).
+- **Caching:** "cache" in the entries below always means the on-device EvidenceSource store (`EVIDENCE-SOURCES.md` §16). The backend keeps no cache (ADR-028).
+- **Query sanitization:** every evidence or terminology request — automatic, clinician manual search or autocomplete — passes the on-device query sanitizer (`ARCHITECTURE.md` §6.4). Transcript text, raw medication wording and patient identifiers are never sent (ADR-036).
 
 ## 3. Verification Checklist (per provider)
 
@@ -29,7 +31,7 @@ Before implementing a provider, confirm from official documentation and record i
 3. rate limits and quotas
 4. pricing / free or development availability
 5. data retention and whether submitted data is used for training
-6. suitability for health data (data-processing agreement, BAA or equivalent where the target jurisdiction requires it — OD-005)
+6. suitability for health data (data-processing agreement, BAA or equivalent where the target jurisdiction requires it — target markets OD-011; regulatory gate ADR-025)
 7. terms of use, attribution and redistribution requirements
 8. supported languages (speech)
 9. client-side streaming options (short-lived tokens) for speech
@@ -226,7 +228,7 @@ Sources for peer-reviewed biomedical literature.
 | Data received | PMIDs, titles, authors, journal, dates, abstracts where available |
 | Latency considerations | Multiple sequential calls (search then summary); cache results |
 | Fallback | Europe PMC |
-| Privacy considerations | No identifiers in queries |
+| Privacy considerations | No patient identifiers in queries (ADR-036) |
 | Production suitability | Suitable as LITERATURE_PRIMARY after verification |
 | Verification status | VBI |
 | Official documentation URL | https://www.ncbi.nlm.nih.gov/books/NBK25501/ |
@@ -247,7 +249,7 @@ Sources for peer-reviewed biomedical literature.
 | Data received | Article metadata, identifiers (PMID/PMCID/DOI), abstracts, OA links |
 | Latency considerations | Cache |
 | Fallback | PubMed |
-| Privacy considerations | No identifiers |
+| Privacy considerations | No patient identifiers; public product identifiers only as typed values from validated responses (ADR-036) |
 | Production suitability | LITERATURE_SECONDARY |
 | Verification status | VBI |
 | Official documentation URL | https://europepmc.org/RestfulWebService |
@@ -270,11 +272,11 @@ U.S. regulatory and drug-labeling sources plus medication terminology.
 | Credential environment variable | `OPENFDA_API_KEY` (optional, backend) |
 | Free/development availability | Public — VBI |
 | Rate limit | VBI |
-| Data sent | Drug names / identifiers (no patient data) |
+| Data sent | Drug names / typed public product identifiers from validated responses (no patient data, ADR-036) |
 | Data received | Regulatory records with metadata |
 | Latency considerations | Cache; label data changes infrequently |
 | Fallback | DailyMed for labels |
-| Privacy considerations | No identifiers |
+| Privacy considerations | No patient identifiers; public product identifiers only as typed values from validated responses (ADR-036) |
 | Production suitability | Suitable as REGULATORY_SOURCE with displayed disclaimers; openFDA states its data is not for clinical decision-making without validation — VBI exact wording |
 | Verification status | VBI |
 | Official documentation URL | https://open.fda.gov/apis/ |
@@ -295,7 +297,7 @@ U.S. regulatory and drug-labeling sources plus medication terminology.
 | Data received | Application and product records |
 | Latency considerations | Cache |
 | Fallback | Link out to FDA site |
-| Privacy considerations | None (no patient data) |
+| Privacy considerations | No patient identifiers; sanitized drug names and typed public product identifiers from validated responses only (ADR-036, IC-018). Provider logging and retention terms — VBI |
 | Production suitability | Suitable after verification |
 | Verification status | VBI |
 | Official documentation URL | https://open.fda.gov/apis/drug/drugsfda/ |
@@ -316,7 +318,7 @@ U.S. regulatory and drug-labeling sources plus medication terminology.
 | Data received | Product, packaging, labeler data |
 | Latency considerations | Cache |
 | Fallback | DailyMed |
-| Privacy considerations | None |
+| Privacy considerations | No patient identifiers; sanitized drug names and typed public product identifiers from validated responses only (ADR-036, IC-018). Provider logging and retention terms — VBI |
 | Production suitability | Suitable after verification (US products only) |
 | Verification status | VBI |
 | Official documentation URL | https://open.fda.gov/apis/drug/ndc/ |
@@ -338,7 +340,7 @@ U.S. regulatory and drug-labeling sources plus medication terminology.
 | Latency considerations | If file-based, periodic import on backend (non-clinical public data) |
 | Fallback | Link out |
 | Privacy considerations | None |
-| Production suitability | Lower priority for V1; regulatory information, not patient advice |
+| Production suitability | **Not integrated in V1** (F-13): the evidence card links out to the FDA Orange Book page only. Re-evaluate after V1 |
 | Verification status | VBI |
 | Official documentation URL | https://www.fda.gov/drugs/drug-approvals-and-databases/approved-drug-products-therapeutic-equivalence-evaluations-orange-book |
 
@@ -358,7 +360,7 @@ U.S. regulatory and drug-labeling sources plus medication terminology.
 | Data received | SPL metadata and label sections |
 | Latency considerations | Labels are large; fetch sections needed; cache |
 | Fallback | openFDA label endpoint |
-| Privacy considerations | None |
+| Privacy considerations | No patient identifiers; sanitized drug names and typed public product identifiers from validated responses only (ADR-036, IC-018). Provider logging and retention terms — VBI |
 | Production suitability | MEDICATION_LABEL source after verification |
 | Verification status | VBI |
 | Official documentation URL | https://dailymed.nlm.nih.gov/dailymed/app-support-web-services.cfm |
@@ -375,12 +377,12 @@ U.S. regulatory and drug-labeling sources plus medication terminology.
 | Credential environment variable | None expected |
 | Free/development availability | Public — VBI terms |
 | Rate limit | VBI |
-| Data sent | Raw medication wording (no patient data) |
+| Data sent | Sanitized drug term only: drug name plus stated strength/form tokens, produced by the on-device query sanitizer. **Never** `Medication.rawName`, transcript text or identifiers (F-03) |
 | Data received | RxCUI candidates, names, term types |
 | Latency considerations | Called per medication post-consultation; cache |
 | Fallback | Show raw name unnormalized; clinician confirms |
-| Privacy considerations | None |
-| Production suitability | MEDICATION_STANDARD after verification; US-centric coverage (OD-005) |
+| Privacy considerations | No patient identifiers; sanitized drug names and typed public product identifiers from validated responses only (ADR-036, IC-018). Provider logging and retention terms — VBI |
+| Production suitability | MEDICATION_STANDARD after verification; US-centric coverage (OD-011, F-04); normalizations labeled "U.S. drug terminology (RxNorm)" (ADR-036) |
 | Verification status | VBI |
 | Official documentation URL | https://lhncbc.nlm.nih.gov/RxNav/APIs/ |
 
@@ -406,7 +408,7 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Data received | Topic summaries, links |
 | Latency considerations | Cache |
 | Fallback | NCI patient resources (cancer topics); link out |
-| Privacy considerations | None |
+| Privacy considerations | No patient identifiers; sanitized clinical terms only, sent from the backend (ADR-036, IC-018). Terms are health-related, so provider logging and retention terms are reviewed — VBI |
 | Production suitability | PATIENT_EDUCATION after verification |
 | Verification status | VBI |
 | Official documentation URL | https://medlineplus.gov/about/developers/webservices/ |
@@ -423,9 +425,9 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Credential environment variable | None expected |
 | Free/development availability | Public — VBI |
 | Rate limit | VBI |
-| Data sent | Condition terms (no location, no identifiers) |
+| Data sent | Condition terms (no location, no patient identifiers) |
 | Data received | Study records with NCT numbers |
-| Latency considerations | Clinician-initiated, not automatic |
+| Latency considerations | Clinician-initiated only, never automatic (ADR-036) |
 | Fallback | NCI trial resources for cancer |
 | Privacy considerations | No location or patient data |
 | Production suitability | TRIALS after verification; never recommends enrollment |
@@ -448,7 +450,7 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Data received | Matching terms and codes |
 | Latency considerations | Interactive lookup; debounce |
 | Fallback | Free text entry |
-| Privacy considerations | Terms only |
+| Privacy considerations | No patient identifiers; sanitized clinical terms only, sent from the backend (ADR-036, IC-018). Terms are health-related, so provider logging and retention terms are reviewed — VBI |
 | Production suitability | Suitable for lookup; never creates diagnoses or billing codes automatically |
 | Verification status | VBI |
 | Official documentation URL | https://clinicaltables.nlm.nih.gov/ |
@@ -469,7 +471,7 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Data received | Compound records (CID, synonyms, properties) |
 | Latency considerations | On demand only |
 | Fallback | None needed (optional source) |
-| Privacy considerations | None |
+| Privacy considerations | No patient identifiers; sanitized clinical terms only, sent from the backend (ADR-036, IC-018). Terms are health-related, so provider logging and retention terms are reviewed — VBI |
 | Production suitability | Supplementary; never replaces regulatory labeling |
 | Verification status | VBI |
 | Official documentation URL | https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest |
@@ -490,7 +492,7 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Data received | Population-level indicators |
 | Latency considerations | On demand; cache |
 | Fallback | Link out |
-| Privacy considerations | None |
+| Privacy considerations | No patient identifiers; sanitized clinical terms only, sent from the backend (ADR-036, IC-018). Terms are health-related, so provider logging and retention terms are reviewed — VBI |
 | Production suitability | Context only; never patient-specific advice |
 | Verification status | VBI |
 | Official documentation URL | https://www.who.int/data/gho/info/gho-odata-api |
@@ -500,7 +502,7 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Field | Value |
 |---|---|
 | Provider | National Cancer Institute |
-| Purpose | Cancer information, patient education, cancer trial resources |
+| Purpose | Cancer patient-information pages (automatic CANCER_INFO route) and cancer trial records (clinician request only, ADR-036); health-professional summaries not integrated in V1 |
 | Category | Health information / clinical trial |
 | Potential endpoint/API family | NCI clinical trials API and other NCI APIs — VBI (some may require a key) |
 | Credential required | VBI |
@@ -511,7 +513,7 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Data received | Information pages, trial records |
 | Latency considerations | On demand |
 | Fallback | MedlinePlus; ClinicalTrials.gov |
-| Privacy considerations | None |
+| Privacy considerations | No patient identifiers; sanitized clinical terms only, sent from the backend (ADR-036, IC-018). Terms are health-related, so provider logging and retention terms are reviewed — VBI |
 | Production suitability | Supplementary; never implies malignancy |
 | Verification status | VBI |
 | Official documentation URL | https://www.cancer.gov/ and https://clinicaltrialsapi.cancer.gov/ (VBI) |
@@ -532,7 +534,7 @@ Supporting sources for patient education, trials, terminology, chemistry and pop
 | Data received | Generated text with source links |
 | Latency considerations | Slower; optional |
 | Fallback | None — absence is shown as "no evidence found" |
-| Privacy considerations | No identifiers; check display/attribution requirements |
+| Privacy considerations | No patient identifiers (public product identifiers only as typed values, ADR-036); check display/attribution requirements |
 | Production suitability | Not enabled in V1 without a dedicated ADR |
 | Verification status | VBI |
 | Official documentation URL | https://ai.google.dev/gemini-api/docs/grounding |
@@ -548,7 +550,7 @@ Platform services that host the backend and support operations.
 | Field | Value |
 |---|---|
 | Provider | Supabase |
-| Purpose | Serverless backend (Edge Functions), possibly authentication (OD-004) |
+| Purpose | Serverless backend (Edge Functions) and clinician authentication (Supabase Auth, ADR-032) |
 | Category | Infrastructure |
 | Potential endpoint/API family | Edge Functions, Auth, project secrets — VBI |
 | Credential required | Yes |
@@ -566,7 +568,7 @@ Platform services that host the backend and support operations.
 
 ## 28. Crash Reporting
 
-Provider: OPEN DECISION OD-009 (e.g. Sentry). If Sentry is chosen, `SENTRY_DSN` is client configuration, and scrubbing is mandatory (`SECURITY.md`). VBI.
+**Decision (OD-009 resolved, ADR-030):** V1 ships **without a third-party crash-reporting SDK**. Stability monitoring uses Google Play Console Android vitals; VBI exactly what Play collects. Local ProviderExecution records support debugging on the device. Adding an SDK later (e.g. Sentry, with `SENTRY_DSN` as client configuration) requires a new ADR, a scrubbing allow-list, a privacy review, and an update to the Data Safety form.
 
 ## 29. Provider Routing
 
@@ -580,12 +582,31 @@ LITERATURE_SECONDARY  Europe PMC
 MEDICATION_STANDARD   RxNorm
 MEDICATION_LABEL      DailyMed (fallback: openFDA label)
 REGULATORY_SOURCE     openFDA / Drugs@FDA
+PRODUCT_IDENTIFICATION NDC Directory (via openFDA ndc; Phase 11)
 PATIENT_EDUCATION     MedlinePlus
-TRIALS                ClinicalTrials.gov
+TRIALS                ClinicalTrials.gov, NCI trials (clinician-requested only)
 TERMINOLOGY           NLM Clinical Tables
+REGULATORY_SAFETY     openFDA adverse events / enforcement / shortages (Phase 12)
+CANCER_INFO           NCI patient-information pages (Phase 12; trial records only via TRIALS on clinician request)
+CHEMICAL              PubChem (Phase 12; clinician-requested only)
+PUBLIC_HEALTH         WHO GHO (Phase 12; clinician-requested only)
+ORANGE_BOOK           not integrated in V1 (link-out)
 ```
 
+Every provider in this catalog has a route or an explicit "not integrated in V1" status (F-13).
+
 Routing lives in backend configuration and can disable a provider without an app release.
+
+**Routing configuration schema (ADR-042, IC-015).** Each route has:
+- `enabled` (boolean); an unset route is disabled
+- `primary` (adapter ID)
+- `fallback` (ordered adapter IDs; fallback only on failure, never parallel duplicate calls)
+- `retryMax` (0 or 1)
+- `timeoutMs`
+- `trigger`: AUTOMATIC or CLINICIAN_REQUEST_ONLY. For TRIALS, CHEMICAL and PUBLIC_HEALTH, CLINICIAN_REQUEST_ONLY is a **code constant** in both app and backend; configuration can only restrict, never relax it, and a load-time test checks this (ADR-036, ADR-043). The device route table decides automatic routes, and the backend re-checks them
+- `scope` (e.g. CANCER_INFO = NCI patient-information pages only)
+
+The backend rejects an AUTOMATIC request on a CLINICIAN_REQUEST_ONLY route.
 
 ## 30. Environment Variables
 
@@ -604,7 +625,7 @@ Routing lives in backend configuration and can disable a provider without an app
 | SUPABASE_SERVICE_ROLE_KEY | backend | yes |
 | SUPABASE_URL | app + backend | no |
 | SUPABASE_ANON_KEY | app | no (public by design) |
-| SENTRY_DSN | app | no (if OD-009 selects Sentry) |
+| SENTRY_DSN | app | not used in V1 (ADR-030); reserved if a crash SDK is later approved |
 
 These must never contain real values in Git. `.env.example` lists names only.
 

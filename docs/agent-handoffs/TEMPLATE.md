@@ -51,3 +51,7 @@
 ## Receiving Agent
 
 <agent name(s)> — REVIEW REQUIRED: <yes/no, by whom>
+
+## Next Action
+
+<the single next step and who takes it>

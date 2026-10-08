@@ -24,7 +24,7 @@ Official guidance: start with 3–5 teammates; token cost scales linearly with t
 
 ## Stage B — Foundations
 
-- **Active:** data-engineer, backend-api-engineer (scaffold only after OD-004 is decided), mobile-android-engineer, ux-accessibility-engineer; devops-android-release-engineer for Phase 1–2 CI; security-privacy-engineer reviews.
+- **Active:** data-engineer, backend-api-engineer (foundation in Phase 7B, ADR-026), mobile-android-engineer, ux-accessibility-engineer; devops-android-release-engineer for Phase 1–2 CI; security-privacy-engineer reviews.
 - **BUILD_PLAN phases:** 1 Repository Foundation, 2 Expo and Android Foundation, 3 UI System, 4 Local Database, 5 Patient System, 6 Visit System.
 - **Precondition for parallel work:** domain types and repository interfaces (Gate 2) and API client contracts (Gate 3) are fixed in `docs/INTEGRATION-CONTRACTS.md`.
 
@@ -32,7 +32,7 @@ Official guidance: start with 3–5 teammates; token cost scales linearly with t
 
 - **Active:** speech-diarization-engineer, ai-clinical-engineer, evidence-research-engineer, backend-api-engineer; clinical-safety-engineer reviews continuously.
 - **BUILD_PLAN phases:** 7 Recording, 8 Speech, 9 Speaker Diarization, 10 Clinical Extraction, 11 Medication Intelligence, 12 Evidence Engine, 13 AI Reasoning.
-- **Gating decisions:** OD-001, OD-002, OD-004, OD-007 (project owner).
+- **Gating decisions:** OD-001, OD-002, OD-007, OD-011 (project owner). R2 flag stays OFF (ADR-025).
 
 ## Stage D — Integration
 
@@ -48,7 +48,7 @@ Official guidance: start with 3–5 teammates; token cost scales linearly with t
 
 - **Active:** devops-android-release-engineer, qa-test-engineer, security-privacy-engineer, clinical-safety-engineer, integration-reviewer.
 - **BUILD_PLAN phases:** 23 Android Build, 24 Google Play, 25 Final Release Audit.
-- **Gating decisions:** OD-003, OD-005, OD-006, OD-010; final go decision by the project owner.
+- **Gating decisions:** formal regulatory assessment (ADR-025), OD-006, OD-010, OD-011; final go decision by the project owner.
 
 ## Subagent vs agent team
 

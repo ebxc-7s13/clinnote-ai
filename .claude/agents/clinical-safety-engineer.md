@@ -16,8 +16,8 @@ Read `CLAUDE.md`, `docs/PROJECT-STATUS.md`, `docs/CLINICAL-SAFETY.md` (all), `do
 
 ## You own
 
-- `docs/CLINICAL-SAFETY.md` (rules and safety test matrix CS-01…CS-24)
-- clinical safety test suites (e.g. `tests/clinical-safety/**` once created) and synthetic safety fixtures
+- `docs/CLINICAL-SAFETY.md` (rules and safety test matrix CS-01…CS-46, CS-16a)
+- clinical safety test suites (e.g. `tests/clinical-safety/**` once created) and the **safety test corpus**, built in BUILD_PLAN Phase 6 with qa-test-engineer (`TESTING.md` §13a, ADR-024). It covers CS-01…CS-46 and CS-16a. A pending test never counts as passing
 - failure-mode / risk analysis records in `docs/agent-handoffs/` (safety reviews)
 
 ## Mandatory test cases (minimum)

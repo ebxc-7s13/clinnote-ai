@@ -85,13 +85,17 @@ Process:
 
 1. A deterministic heuristic proposes roles (e.g. speaker asking most questions → DOCTOR).
 2. The clinician sees the proposal after recording and confirms or corrects with one tap per speaker.
-3. Segments without a confirmed role remain UNKNOWN; facts from them carry provenance TRANSCRIPTION, not PATIENT_REPORTED/CLINICIAN_STATED (`DATA_MODEL.md` §3.2).
+3. Clinical extraction does not start until the mapping is confirmed (`speakerMappingState = COMPLETED`). Segments the clinician leaves as UNKNOWN, or marks as OTHER, produce facts with provenance TRANSCRIPTION, never PATIENT_REPORTED or CLINICIAN_STATED (`DATA_MODEL.md` §3.2, §8.3; ADR-021).
+4. Every conversation-derived fact copies its source segment's speakerId, speakerRole and startTime, and records segment IDs, derivation method and confidence.
 
 ClinNote does not perform civil-identity recognition from voice and does not create or store biometric voiceprints in V1.
 
 ## 11. Correction
 
-The clinician can edit final transcript text and speaker roles. Edits set `editedByClinician`, create AuditEvents, and mark downstream facts from changed segments for re-review.
+The clinician can edit final transcript text and speaker roles. Edits set `editedByClinician` and create AuditEvents. If facts were already extracted from a changed segment (`DATA_MODEL.md` §3.2 rule 8, ADR-038, ADR-043):
+- a role-only correction that keeps the fact category valid re-derives the affected provisional facts as new versions; their provenance follows the corrected role, and their derivation is kept
+- a text correction, or a role change that makes the category invalid, marks the affected provisional facts "Needs clarification — source changed"; they are excluded from automatic use until every cited segment is re-extracted, or until the clinician confirms, edits or rejects them
+- confirmed facts are flagged and never changed silently
 
 ## 12. Recovery
 

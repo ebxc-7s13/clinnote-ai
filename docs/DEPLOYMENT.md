@@ -42,13 +42,13 @@ Production secrets are never available to development or preview.
 - Secrets stored in the Supabase project secret store.
 - Function logging configured to exclude request/response bodies.
 - No database tables for clinical content. Any operational tables (e.g. rate-limit counters) hold no clinical content.
-- Processing region chosen with OD-005 in mind.
+- Processing region chosen with the target markets (OD-011) and the regulatory assessment (ADR-025) in mind.
 
 ## 6. Environment Variables and Secrets
 
 See `API_CATALOG.md` §30 for the full list and which are secret.
 
-- App: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SENTRY_DSN` (if OD-009 selects Sentry).
+- App: `SUPABASE_URL`, `SUPABASE_ANON_KEY`. No crash SDK DSN in V1 (ADR-030).
 - Backend: all provider keys, `SUPABASE_SERVICE_ROLE_KEY`, NCBI configuration.
 - CI: only what build/test steps need; tests use mocks so no provider keys are needed in CI.
 - `.env.example` lists names only.
@@ -100,7 +100,7 @@ CD to Google Play is manual (upload or EAS Submit) after the checklist in `GOOGL
 
 ## 12. Error Tracking
 
-Crash reporting provider is OD-009. Requirements: scrubbing allow-list, no breadcrumbs with screen text, no request bodies, opt-out capability, disclosed in privacy policy and Data Safety.
+V1 ships no crash-reporting SDK (ADR-030, OD-009 resolved). Stability is monitored through Google Play Console Android vitals. Adding an SDK later requires an ADR, a scrubbing allow-list (no breadcrumbs with screen text, no request bodies), opt-out, and updates to the privacy policy and Data Safety.
 
 ## 13. Provider Fallback
 
@@ -112,9 +112,9 @@ Configured per route on the backend (`API_CATALOG.md` §29). Fallback providers 
 - production provider accounts with appropriate data terms
 - rate limits and spend alerts configured
 - logging excludes bodies (verified)
-- crash scrubbing verified
-- encryption at rest enabled (OD-003)
-- authentication enforced (OD-004)
+- no crash or analytics SDK present (ADR-030)
+- SQLCipher encryption at rest verified on device (ADR-031)
+- clinician authentication enforced on every function (ADR-032)
 - cleartext traffic disabled
 - feature flags default safe
 - all OPEN DECISIONS resolved

@@ -30,6 +30,8 @@ Before any integration, verify against the provider's current official documenta
 
 Medication flow: extraction → RxNorm normalization → DailyMed → Drugs@FDA/openFDA → clinician review. Never modify dose, route, frequency or duration.
 
+Evidence ranking and deduplication are deterministic (EVIDENCE-SOURCES §14–§15). Caching is on the device only (§16). Queries come only from the on-device sanitizer (F-03). Evidence is retrieved **before** possibilities are generated (ADR-023).
+
 ## Tiers
 
 1 government/regulatory · 2 recognized guidelines · 3 peer-reviewed literature · 4 government patient information · 5 trusted secondary (ADR required) · 6 general web (supplementary; not enabled in V1). FDA is a regulator that publishes regulatory information — never describe FDA sources as "FDA-approved knowledge".
@@ -41,7 +43,7 @@ Every result: source, source type, tier, date(s), identifier where available, re
 - fabricate or let anything fabricate a PMID, FDA record, drug label, trial, citation, URL or publication
 - treat random web pages as authoritative
 - recommend trial enrollment or present population data as patient advice
-- scrape or rehost copyrighted images; if licensing is uncertain, link to the source. Label images "ILLUSTRATIVE / REFERENCE IMAGE", never "PATIENT MATCH". Image source is OD-008.
+- scrape or rehost copyrighted images; if licensing is uncertain, link to the source. Label images "ILLUSTRATIVE / REFERENCE IMAGE", never "PATIENT MATCH". V1 displays no reference images (ADR-029).
 - send patient identifiers in queries
 
 ## Required tests

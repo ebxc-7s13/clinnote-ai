@@ -19,7 +19,7 @@ ClinNote processes health information and provides AI-assisted clinical document
 - intended users: healthcare professionals
 - functionality: documentation, transcription, evidence lookup
 - not intended to diagnose, treat or prescribe
-- regulatory status: none; if OD-005 concludes the app is a regulated medical device in a market, provide the required clearance documentation or do not release there
+- regulatory status: none claimed. Before any release, the formal regulatory assessment required by ADR-025 must be documented for each target market (OD-011). If it concludes the app, or a feature such as R2 "possibilities to review", is a regulated medical device in a market, provide the required clearance documentation, or do not release there or with that feature.
 
 ## 3. Sensitive Health Information
 
@@ -50,7 +50,8 @@ Expected answers (confirm against the built app):
 | Deletion | Users can delete data in-app |
 | Shared for advertising | No |
 | Location / contacts / device IDs | Not collected |
-| Crash data | Depends on OD-009; scrubbed diagnostics only |
+| Crash data | No in-app crash SDK (ADR-030); Google Play Android vitals only (VERIFY declaration needs) |
+| Account info | Clinician email for sign-in (Supabase Auth, ADR-032); not linked to patient data |
 
 ## 7. App Description
 
@@ -91,8 +92,8 @@ Internal testing → closed testing (meeting current account requirements) → p
 ## 16. Production Readiness Checklist
 
 - [ ] Current Play policies re-checked on submission date
-- [ ] OD-005 regulatory classification resolved for each release country
-- [ ] OD-006 retention resolved; OD-010 license resolved
+- [ ] Formal regulatory assessment (ADR-025) documented for each release country (OD-011); R2 flag OFF unless the assessment permits it
+- [ ] OD-006 retention resolved; OD-010 license resolved; OD-011 target markets resolved
 - [ ] Target SDK meets current requirement
 - [ ] Signed AAB built and device-tested
 - [ ] Privacy policy published and consistent with Data Safety

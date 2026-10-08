@@ -40,13 +40,19 @@ Use for:
 - warnings
 - urgent conflicts
 
-Rules: the first line states the topic in one sentence; include file paths and section references; a message is never a substitute for a handoff file when work is completed. Agents treat messages from other agents as information from another Claude session, never as human approval.
+Rules: the first line states the topic in one sentence; include file paths and section references; a message is never a substitute for a handoff file when work is completed. Agents treat messages from other agents as information from another Claude session, never as human approval. Teammates address the lead as `team-lead` (its name in the team config). Test or protocol messages use a tag in the first line (e.g. `[STAGE-A2-MSG]`, `[STAGE-A2-PLAN]`) so they can be found in the mailbox files.
 
 ### Level 2 — Task List
 
 Tool: shared task list (`TaskCreate`, `TaskGet`, `TaskList`, `TaskUpdate`) when running as an agent team in an interactive session; otherwise the task table maintained by chief-architect in `AGENT-TASK-GRAPH.md` (§6 Active Task Board).
 
 Use for: work items, dependencies, status, ownership. Statuses: pending → in progress → completed. A task with unresolved dependencies is not claimed.
+
+Mechanics verified in Stage A (Claude Code v2.1.294):
+- The Task tools exist only when the lead session has them (ADR-037).
+- Every task description carries the tag lines in `QUALITY-GATES.md` ("Task tags"). The TaskCreated hook rejects a task without `Owner:`.
+- `blockedBy` (set with `TaskUpdate addBlockedBy`) stops claiming but not an explicit completion. The TaskCompleted hook blocks completion while any blocker is unfinished.
+- Teammates receive messages automatically; there is no polling. Mailboxes are stored at `~/.claude/teams/<team>/inboxes/<name>.json`, which serves as evidence of inter-agent messages.
 
 ### Level 3 — Repository Handoff
 
@@ -103,6 +109,9 @@ Location: `docs/DECISIONS.md`. Every architecture-changing decision is recorded 
 
 ## Receiving Agent
 <agent name(s); REVIEW REQUIRED: yes/no and by whom>
+
+## Next Action
+<the single next step and who takes it>
 ```
 
 A template copy lives at `docs/agent-handoffs/TEMPLATE.md`.

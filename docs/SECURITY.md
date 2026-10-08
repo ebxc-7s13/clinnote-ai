@@ -10,11 +10,11 @@ Protect patient information, clinician information, transcripts, notes, temporar
 
 | Threat | Primary controls |
 |---|---|
-| Lost or stolen device | Device lock, app lock, encrypted local database (OD-003) |
+| Lost or stolen device | Device lock, app lock, SQLCipher-encrypted local database (ADR-031) |
 | Reverse-engineered APK | No private secrets in the app |
-| Backend abused as a free AI proxy | Authentication (OD-004), rate limits, quotas |
+| Backend abused as a free AI proxy | Clinician authentication (ADR-032), per-user rate limits, quotas |
 | Prompt injection via transcript or evidence | Data/instruction separation, schema output, validators (`AI.md` §10) |
-| Clinical data leaking via logs, analytics, crash reports | Logging rules, no analytics in V1, crash scrubbing |
+| Clinical data leaking via logs, analytics, crash reports | Logging rules; no analytics and no crash SDK in V1 (ADR-030) |
 | Secrets committed to Git | `.gitignore`, CI secret scanning, push protection |
 | Compromised dependency | Audits, lockfile, provenance checks |
 | Malicious or malformed provider responses | Response schema validation |
@@ -41,7 +41,7 @@ Private keys must never be placed in:
 ## 5. Environment Variables
 
 - `.env*` files are gitignored; `.env.example` contains names only.
-- App-side variables are limited to public configuration (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SENTRY_DSN` if chosen).
+- App-side variables are limited to public configuration (`SUPABASE_URL`, `SUPABASE_ANON_KEY`); no crash SDK DSN in V1 (ADR-030).
 - Separate values per environment (development, preview, production); production secrets are never available to development.
 
 ## 6. Server-Side Credentials
@@ -56,13 +56,15 @@ Private keys must never be placed in:
 - Clinical data only in the app-private SQLite database and app-private files.
 - Temporary audio in app-private storage; deleted per ADR-014.
 - No clinical data in shared/external storage except explicit exports.
-- Encryption keys (once OD-003 is resolved) stored in Android Keystore-backed secure storage.
+- The database encryption key is a random 256-bit value stored in Android Keystore-backed secure storage (ADR-031).
 
 ## 8. Encryption Decision
 
 - In transit: TLS for all network traffic; cleartext traffic disabled.
-- At rest: Android provides file-based encryption on supported devices; ClinNote additionally requires an app-level encrypted database before any build is distributed beyond the developer. The mechanism (e.g. SQLCipher-backed SQLite if supported by the current Expo SQLite library) is OPEN DECISION OD-003, to be verified and decided in BUILD_PLAN Phase 4 and implemented by Phase 19.
-- Development builds with synthetic data may run unencrypted until then.
+- At rest: Android provides file-based encryption on supported devices. In addition, ClinNote encrypts its database with **SQLCipher via expo-sqlite (`useSQLCipher`)**. This was verified in the official Expo SDK 57 docs on 2026-10-08 and is re-verified at Phase 4 (ADR-031, OD-003 resolved for planning).
+- The key is set with `PRAGMA key` from Keystore-backed secure storage. SQLCipher is unavailable in Expo Go, so development uses EAS development builds.
+- Encryption is enabled from BUILD_PLAN Phase 4 onward. No unencrypted database build is distributed.
+- If the key is lost (app data cleared), the data is unrecoverable, consistent with ADR-017. The clinician is told this.
 
 ## 9. Network Security
 
@@ -72,7 +74,9 @@ Private keys must never be placed in:
 
 ## 10. Authentication
 
-The app must authenticate to the backend so that paid provider calls cannot be made anonymously. Mechanism is OPEN DECISION OD-004 (options: platform app-integrity attestation, Supabase Auth clinician accounts, or both). Required properties regardless of choice:
+The app must authenticate to the backend so that paid provider calls cannot be made anonymously.
+
+**Decision (ADR-032, OD-004 resolved for planning):** clinician accounts via Supabase Auth. Edge Functions verify the JWT (default `verify_jwt = true`, per the Supabase docs read on 2026-10-08) and apply per-user rate limits. The exact sign-in method is verified at Phase 7. Platform app-integrity attestation is evaluated as extra hardening in Phase 19. Required properties:
 
 - no shared static secret embedded in the app as the sole control
 - tokens short-lived and revocable
@@ -87,6 +91,9 @@ The app must authenticate to the backend so that paid provider calls cannot be m
 ## 12. Rate Limiting and Abuse Prevention
 
 - Per-client and global limits on speech minutes, LLM calls and evidence calls.
+- Counter storage (ADR-042): non-clinical rows `(opaque user id, endpoint class, window start, count)` only, with no content, IP or email. Rows are deleted after the longest window plus 24 h and on account deletion. Access is through the service role inside functions only.
+- Backend R2 enforcement: jobs 12, 13 and 16 are refused with `FEATURE_DISABLED` when their flags are OFF (ADR-042).
+- `/health` is unauthenticated and returns only `{status, version}`. Flags and routing are served only by the authenticated `/config` endpoint.
 - Request-size caps (e.g. transcript length, audio chunk size).
 - Daily spend alerts on provider accounts.
 - Ability to disable a client or a provider route without an app release.
@@ -119,7 +126,7 @@ Never log: transcripts, patient names or references, medication lists, diagnoses
 
 Allowed: event name, stage, provider ID, duration, status code, error class, random request ID.
 
-Crash reporting (OD-009) requires a scrubbing hook with an allow-list; breadcrumbs, screen text and request bodies removed.
+V1 includes **no crash-reporting or analytics SDK** (ADR-030). Stability uses Google Play Console Android vitals. Any future crash SDK requires an ADR and a scrubbing allow-list that removes breadcrumbs, screen text and request bodies.
 
 ## 18. Export Security and Secure Deletion
 
@@ -148,8 +155,8 @@ Release (Phase 25) requires all of the following, each with test or review evide
 5. Rate limits trigger at configured thresholds (test).
 6. Provider responses with unexpected schema are rejected (test with fake FDA/PubMed responses).
 7. Prompt-injection test transcript produces no diagnosis or instruction-following behavior (test).
-8. Local database is encrypted at rest using the OD-003 mechanism (verified on device).
-9. No clinical content appears in backend logs or crash reports during the full synthetic E2E suite (log inspection).
+8. Local database is encrypted at rest with SQLCipher (ADR-031), verified on device: the database file is unreadable without the key.
+9. No clinical content appears in backend logs during the full synthetic E2E suite (log inspection). The built app contains no crash or analytics SDK (dependency inspection).
 10. Dependency audit has no unresolved high/critical advisories.
 11. Cleartext network traffic is disabled (config review).
 12. Exports show the warning and write an AuditEvent (test).

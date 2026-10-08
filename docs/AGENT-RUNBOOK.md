@@ -113,3 +113,14 @@ Only one lead (orchestrating) Claude session writes to a given working tree at a
 ## 8. Session Close
 
 At the end of an orchestrated session, chief-architect: updates `PROJECT-STATUS.md`, `AGENT-STATUS.md`, `BUILD_REPORT.md`; commits; appends the final terminal report with a UTC timestamp to `terminal_report.txt`; pushes after a clean final verification (`.claude/rules/reporting.md`).
+
+## 9. Lead Review of Plans (plan approval)
+
+Native plan mode is not a review gate: when a teammate spawned in plan mode finishes planning, Claude Code approves its plan in the lead session automatically, without the lead reviewing it (official agent-teams docs, re-read 2026-10-08). For risky or implementation work, ClinNote therefore uses this protocol:
+
+1. The teammate plans **without modifying files** and sends the plan to `team-lead` with SendMessage. The first line is `[PLAN] <task> v<N> — requesting approval`.
+2. The lead checks the plan against five items: implementation steps · tests · security considerations · documentation updates · handoff.
+3. The lead replies `APPROVED` or `REJECTED: <specific missing items>`. A rejected plan is revised and resent as v<N+1>.
+4. The teammate starts implementing only after `APPROVED`. The decision and its reason are recorded in the task's handoff (`## Plan`).
+
+Tested in Stage A run 2 (`docs/agent-handoffs/2026-10-08-stage-a-team2-synthesis.md`).
