@@ -161,6 +161,19 @@ See `docs/ARCHITECTURE.md`.
 | `docs/PROJECT-STATUS.md` | Current phase and status |
 | `docs/BUILD_REPORT.md` | Factual report of the latest phase |
 | `docs/DECISIONS.md` | Architecture decisions and open decisions |
+| `docs/AGENT-SYSTEM.md` | Multi-agent engineering organization overview |
+| `docs/AGENT-OWNERSHIP.md` | Who owns which area, document and code path |
+| `docs/AGENT-COMMUNICATION.md` | Messaging, task list, handoff and decision protocol |
+| `docs/AGENT-TASK-GRAPH.md` | Phase dependency graph, critical path, task board |
+| `docs/AGENT-RUNBOOK.md` | Standard operating procedure for every agent |
+| `docs/QUALITY-GATES.md` | The 10 quality gates and their current status |
+| `docs/INTEGRATION-CONTRACTS.md` | Interface register between agents' subsystems |
+| `docs/AGENT-STATUS.md` | Status dashboard of the 14 agents |
+| `docs/agent-handoffs/` | Handoff and review records |
+| `.claude/agents/` | The 14 Claude Code agent definitions |
+| `.claude/rules/` | Always-loaded project rules |
+| `.claude/orchestration/` | Stages, spawn templates, hook plan |
+| `terminal_report.txt` | Timestamped copies of every final terminal report |
 
 ## Implementation Stages
 
@@ -194,6 +207,16 @@ See `docs/ARCHITECTURE.md`.
 | 25 | Final Release Audit |
 
 Details: `docs/BUILD_PLAN.md`.
+
+## Building with the Agent System
+
+ClinNote is built by a 14-agent Claude Code organization led by `chief-architect`. To start an orchestrated session:
+
+```bash
+claude --agent chief-architect
+```
+
+See `docs/AGENT-SYSTEM.md`.
 
 ## License
 

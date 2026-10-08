@@ -161,6 +161,33 @@ Note: ADR numbering was reorganized on 2026-10-08 during the documentation corre
 - **Consequences:** Data loss on device loss unless exported; clinician informed.
 - **Future review condition:** Clinic/multi-device demand with legal review.
 
+## ADR-018 — Documentation Authority Order and Safety Restriction Principle
+
+- **Status:** ACCEPTED (2026-10-08)
+- **Context:** The multi-agent instructions specified an authority order (CLAUDE.md → PRODUCT_SPEC → CLINICAL-SAFETY → ARCHITECTURE → DATA_MODEL → API_CATALOG → SECURITY → PRIVACY → BUILD_PLAN → TESTING → DEPLOYMENT → GOOGLE-PLAY → UI-UX → implementation). The previous `CLAUDE.md` put CLINICAL-SAFETY, PRIVACY and SECURITY first. The two orders contradicted each other.
+- **Decision:** Adopt the specified order. Add, inside CLAUDE.md (rank 1), a safety restriction principle: restrictive requirements in CLINICAL-SAFETY, SECURITY or PRIVACY prevail over conflicting permissive statements in any document.
+- **Reason:** This follows the owner's ordering while preserving the project's non-negotiable safety boundary.
+- **Consequences:** CLAUDE.md §2, PRODUCT_SPEC, CLINICAL-SAFETY and `.claude/rules/documentation-and-scope.md` are updated to match.
+- **Future review condition:** Any proposal to let a permissive requirement override a safety, security or privacy restriction requires a new ADR and owner approval.
+
+## ADR-019 — Fourteen-Agent Engineering Organization
+
+- **Status:** ACCEPTED (2026-10-08)
+- **Context:** ClinNote spans many specialized layers, and independent review is essential for clinical safety and security.
+- **Decision:** Build ClinNote with 14 project-scoped Claude Code subagents (`.claude/agents/`), orchestrated by `chief-architect`. The system includes ownership (`docs/AGENT-OWNERSHIP.md`), communication and handoff protocol, quality gates, a runbook and an integration contract register. Only chief-architect holds the Agent tool, and tools follow least privilege.
+- **Reason:** Focused context, clear ownership, independent review, safe parallelism.
+- **Consequences:** Higher token cost and coordination overhead, controlled by stage-based activation and concurrency ceilings (`.claude/orchestration/team-stages.md`).
+- **Future review condition:** Revisit if coordination overhead outweighs the benefit, or when Claude Code agent features change.
+
+## ADR-020 — Agent Teams Enabled Experimentally, with a Subagent Fallback
+
+- **Status:** ACCEPTED (2026-10-08)
+- **Context:** Agent teams are experimental in Claude Code v2.1.293. They are enabled by the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` env setting, need an interactive lead session, and have known limitations: no resumption of in-process teammates, lagging task status, one team per session, and no nested teams.
+- **Decision:** Enable the setting in project `.claude/settings.json`. Use teams for multi-layer coordination and research that benefits from debate. For everything else, use subagents with chief-architect relay messaging, handoff files and the Active Task Board, including in non-interactive sessions.
+- **Reason:** Get the benefits of teams where they work, without depending on an experimental feature.
+- **Consequences:** While teams are enabled, a subagent that Claude names becomes a teammate in interactive sessions. Teams can be disabled by setting the variable to `0` without other changes.
+- **Future review condition:** When agent teams leave experimental status, or if a Claude Code upgrade changes their behavior. Re-verify the official documentation after every upgrade.
+
 ---
 
 # Open Decisions

@@ -1,6 +1,6 @@
 # ClinNote AI — Clinical Safety Requirements
 
-This document has the highest precedence of all specifications (`CLAUDE.md` §2).
+Its restrictive requirements prevail over any conflicting permissive statement in other documents (`CLAUDE.md` §2, safety restriction principle, ADR-018).
 
 ClinNote has no regulatory approval, certification or clinical validation. Whether it is a regulated medical device in any target market is OPEN DECISION OD-005, requiring qualified regulatory advice. These requirements do not settle that question.
 

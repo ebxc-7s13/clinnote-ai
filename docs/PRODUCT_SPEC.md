@@ -1,6 +1,6 @@
 # ClinNote AI — Product Specification
 
-This is the product authority (`CLAUDE.md`, Section 2). Data structures referenced here are defined in `DATA_MODEL.md`; safety constraints in `CLINICAL-SAFETY.md` override anything here.
+This is the product authority (`CLAUDE.md`, Section 2). Data structures referenced here are defined in `DATA_MODEL.md`; restrictive safety, security and privacy requirements prevail over anything here (`CLAUDE.md` §2, ADR-018).
 
 ---
 
