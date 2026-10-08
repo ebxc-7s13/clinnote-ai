@@ -1,125 +1,106 @@
 # ClinNote AI — Google Play Preparation
 
-All Play policy details below must be verified against current Google Play Console Help and Developer Policy Center pages at release time. VERIFY BEFORE IMPLEMENTATION.
+**Current Google Play policies, forms and requirements must be checked immediately before submission.** Policies change frequently; nothing in this document replaces the current Google Play Developer Policy Center and Play Console Help.
 
-## App Category
+ClinNote holds no regulatory approval, certification or clinical validation, and no Play material may suggest otherwise.
 
-Health-related productivity/application (Medical or Productivity category; final choice made at release).
+---
 
-The exact Play Store category and declarations must be verified before release.
+## 1. Account Requirements
 
-## Health Functionality
+- A Google Play developer account owned by the project owner (personal or organization). Organization accounts may be required or preferable for health apps — VERIFY.
+- Identity verification and contact details completed.
+- New personal accounts may need to complete closed testing with a minimum number of testers for a minimum period before production access — VERIFY current numbers.
 
-ClinNote handles health-related information and provides AI-assisted clinical documentation/evidence review.
+## 2. Health-App Declaration
 
-Therefore the release process must evaluate:
+ClinNote processes health information and provides AI-assisted clinical documentation and evidence review for healthcare professionals. Complete the Health apps declaration in Play Console describing:
 
-- Health Apps declaration
-- privacy policy
-- Data Safety requirements
-- sensitive permissions
-- medical functionality requirements
-- AI-generated content policy requirements
-- current Play policies
+- intended users: healthcare professionals
+- functionality: documentation, transcription, evidence lookup
+- not intended to diagnose, treat or prescribe
+- regulatory status: none; if OD-005 concludes the app is a regulated medical device in a market, provide the required clearance documentation or do not release there
 
-If a target market treats ClinNote as a medical device (OD-005), Play may require evidence of regulatory clearance; release cannot proceed without it.
+## 3. Sensitive Health Information
 
-## Permissions
+- Health data stays on the device; processing by cloud providers is disclosed.
+- No health data used for advertising; no advertising SDKs.
+- No data sale.
 
-Expected core permission:
+## 4. Microphone Permission
 
-RECORD_AUDIO
+- `RECORD_AUDIO` — core feature; requested at first recording with rationale.
+- If the Phase 7 ADR chooses background recording: foreground service (microphone type) permissions, notification permission, and any Play foreground-service declaration with a demonstration video — VERIFY.
+- No location, contacts, phone, SMS, or other unrelated permissions.
 
-Possibly required, depending on the Phase 5 decision about background recording (`SPEECH.md`, Android Recording Constraints):
+## 5. Privacy Policy
 
-- foreground service permission(s) for a microphone-type foreground service
-- notification permission (for the persistent recording notification on recent Android versions)
+A public privacy policy URL is required before production. It must accurately describe: audio handling and temporary retention, transcription, AI processing and providers, local storage, absence of cloud backup, third-party services, deletion, security, user controls, contact. Derived from `PRIVACY.md` §7 and reviewed by a qualified person.
 
-Each must be justified in the Play Console where required.
+## 6. Data Safety
 
-Only request permissions required by implemented features.
+Expected answers (confirm against the built app):
 
-Do not request unnecessary:
+| Topic | Expected |
+|---|---|
+| Audio collected | Yes — voice/sound recordings, transmitted to service providers for transcription; not stored by ClinNote servers |
+| Health info | Yes — processed by AI service providers for app functionality |
+| Personal identifiers | Optional name/DOB stored on device only; not transmitted |
+| Encrypted in transit | Yes |
+| Deletion | Users can delete data in-app |
+| Shared for advertising | No |
+| Location / contacts / device IDs | Not collected |
+| Crash data | Depends on OD-009; scrubbed diagnostics only |
 
-- location
-- contacts
-- phone
-- SMS
+## 7. App Description
 
-## Privacy Policy
+States clearly: for healthcare professionals; documentation and evidence-review assistant; AI output requires clinician review; does not diagnose, prescribe or replace clinical judgment.
 
-A public privacy policy must be available before production publication.
+## 8. Medical Claims
 
-It must accurately describe:
+Never claim: FDA approval, CDSCO approval, CE certification, clinical validation, medical-device certification, accuracy guarantees, "replaces doctors", "diagnoses", "definitive medical advice".
 
-- audio handling
-- transcription
-- AI processing
-- data storage
-- third-party services
-- deletion
-- security
-- user controls
+## 9. AI-Generated Content
 
-The policy is derived from the provider table in `PRIVACY.md` and must be consistent with the Data Safety form.
+Review current Play policy on AI-generated content; provide in-app reporting/feedback mechanism if required — VERIFY.
 
-## Data Safety
+## 10. Target SDK
 
-Expected declarations (to be confirmed against the implemented app):
+Set target API level to the currently required level for new apps and updates — VERIFY at Phase 23.
 
-- audio is collected and sent to a speech provider for processing (transmitted, not stored by ClinNote's backend)
-- health information is processed by an AI provider
-- data is encrypted in transit
-- users can request deletion (local deletion in-app)
-- no data shared for advertising
-- no location, contacts or advertising IDs collected
+## 11. Release Build
 
-## Medical Claims
+Signed AAB from EAS `production` profile; Play App Signing; `versionCode` increment; release notes.
 
-Do not claim:
+## 12. Store Listing
 
-FDA approval
+App name, short description, full description (§7), category (Medical or Productivity — decide at submission), contact email, privacy policy URL, content rating questionnaire.
 
-CDSCO approval
+## 13. Screenshots
 
-CE certification
+Synthetic patients only (`P-9xxxxx`, fictional names); no real clinical data; show provisional labels honestly; no claims in captions that violate §8.
 
-clinical validation
+## 14. Support
 
-medical-device certification
+Support email and web page; response process for data deletion questions and incident reports.
 
-unless documented evidence actually exists.
+## 15. Testing
 
-## Store Description
+Internal testing → closed testing (meeting current account requirements) → production with staged rollout. Testers use synthetic patients and are instructed not to enter real patient information.
 
-Store listing language must not claim that ClinNote:
+## 16. Production Readiness Checklist
 
-- replaces doctors
-- diagnoses disease autonomously
-- guarantees accuracy
-- provides definitive medical advice
-
-The listing states that ClinNote is intended for healthcare professionals and that AI output requires clinician review.
-
-## Testing
-
-Complete the current Google Play testing requirements applicable to the developer account before production release (e.g. closed-testing requirements for new personal developer accounts — VERIFY current rules).
-
-Do not rely on an outdated understanding of Play Console requirements.
-
-The testing track uses synthetic patients only. Testers must be instructed not to enter real patient information.
-
-## Final Review
-
-Before submission:
-
-- verify current Play policy
-- verify target SDK requirements
-- verify privacy policy
-- verify Data Safety answers
-- verify Health Apps declaration
-- verify permissions
-- verify store screenshots (synthetic data only)
-- verify app description
-- verify contact/support information
-- verify license decision (OD-010)
+- [ ] Current Play policies re-checked on submission date
+- [ ] OD-005 regulatory classification resolved for each release country
+- [ ] OD-006 retention resolved; OD-010 license resolved
+- [ ] Target SDK meets current requirement
+- [ ] Signed AAB built and device-tested
+- [ ] Privacy policy published and consistent with Data Safety
+- [ ] Data Safety form completed
+- [ ] Health apps declaration completed
+- [ ] Permissions declarations completed (and foreground-service declaration if applicable)
+- [ ] Store listing free of prohibited claims
+- [ ] Screenshots synthetic only
+- [ ] Support contact working
+- [ ] Closed testing requirements met
+- [ ] Security, privacy, clinical-safety acceptance criteria met (Phase 25)

@@ -1,151 +1,127 @@
-# ClinNote AI — Privacy Requirements
+# ClinNote AI — Technical Privacy Specification
 
-## Privacy Philosophy
+This is a technical specification. It is not legal advice and not a public privacy policy. **Production deployment requires legal/privacy review.** ClinNote does not claim compliance with any law (e.g. HIPAA, GDPR, India's DPDP Act) merely by following this document; applicable law depends on target jurisdictions (OD-005).
 
-Collect the minimum information required.
+---
 
-Prefer local-first storage.
+## 1. Data Minimization
 
-Avoid unnecessary cloud storage of clinical information.
+- Collect only what the clinical documentation workflow needs.
+- No location, contacts, phone state, SMS, advertising ID or unrelated device data.
+- Send the minimum necessary data to each external provider (§7).
+- V1 has no product analytics.
 
-## Patient Identity
+## 2. Patient Identifiers
 
-A patient reference should be sufficient for normal operation.
+- The only required identifier is an internal reference (`P-000001`).
+- Name and date of birth are optional and never required to create a note.
+- Identifiers are never sent to AI or evidence providers (§7).
+- Identifiers are never logged.
 
-Example:
+## 3. Local-First Storage
 
-P-000001
+- Patient records live only on the clinician's device (ADR-005, ADR-017).
+- No cloud backup or sync in V1. The clinician is told that uninstalling the app or losing the device loses the data unless exported.
+- The backend stores no clinical content.
+- Encryption at rest per `SECURITY.md` §8 (OD-003).
 
-The system should not require a full legal identity simply to create a clinical note.
+## 4. Audio Handling
 
-Name and date of birth are optional fields (`DATA_MODEL.md`).
+- Recording only after clinician-attested consent (§11) with a visible recording indicator.
+- Raw audio is temporary: deleted after the final transcript succeeds, when the visit is discarded, or after 24 hours at most (ADR-014).
+- Retention beyond that only by explicit per-visit clinician opt-in, off by default.
+- Audio is sent only to the selected speech provider.
+- No voiceprints or biometric identifiers.
 
-## Recording
+## 5. Transcript Handling
 
-Recording requires explicit user initiation and appropriate consent workflow.
+- Stored locally as part of the visit.
+- Sent to the LLM provider for the current visit's AI jobs only.
+- Editable by the clinician; deletable with the visit.
+- Never in logs, analytics or crash reports.
 
-The microphone must have a visible active state.
+## 6. Cloud Processing
 
-Consent is recorded as a `ConsentRecord`; recording cannot start without one (`SPEECH.md`).
+When a cloud provider processes audio or text, ClinNote must:
 
-## Audio
-
-Raw audio should not be retained permanently by default.
-
-Temporary audio should be deleted after successful processing unless the clinician explicitly chooses retention.
-
-Regardless of processing outcome, temporary audio is deleted after the maximum temporary retention period (default 24 hours, ADR-012) unless the clinician explicitly chose retention for that visit. Explicit retention is opt-in per visit and is off by default.
-
-## Cloud Processing
-
-If a cloud provider processes clinical text or audio:
-
-- disclose that processing
+- disclose it in-app (before first recording) and in the privacy policy
 - send minimum necessary data
-- use secure transport
-- protect credentials
-- review provider terms
-- verify applicable data-processing requirements
+- use TLS
+- keep credentials server-side
+- review and record provider retention, training-use and processing-location terms
+- verify applicable data-processing agreements for the target jurisdiction before production
 
-The backend does not persist clinical content (`ARCHITECTURE.md` Section 4). Data sent to providers is subject to that provider's retention terms, which must be reviewed and recorded before production.
+The clinician can turn off cloud AI features in Settings; ClinNote then works in manual mode.
 
-Evidence queries contain clinical concepts only, never identifiers (`ARCHITECTURE.md` Section 10).
+## 7. Provider Data Handling
 
-The clinician can disable cloud AI features in Settings; the app then operates in manual mode.
+| Provider category | Data sent | Never sent |
+|---|---|---|
+| Speech (OD-001) | audio stream | name, DOB, reference |
+| LLM (OD-002) | current-visit transcript, structured facts, evidence excerpts, age/sex if stored | name, DOB, reference, other visits' transcripts |
+| Evidence/terminology | clinical concept terms, drug names | any identifier, transcript text, dates, location |
+| Backend host | all of the above in transit | — (not persisted) |
 
-## Development
+Third-party provider table (completed in BUILD_PLAN Phase 20 before production):
 
-Only synthetic patient data may be used during development.
-
-## Analytics
-
-Do not send:
-
-- transcript
-- patient identifier
-- medication
-- symptoms
-- diagnosis
-- clinical note
-- audio
-
-to product analytics.
-
-V1 ships without product analytics. Adding analytics requires an ADR and a privacy review.
-
-## Crash Reports
-
-Do not include clinical content.
-
-See `SECURITY.md`, Crash Reporting.
-
-## Data Minimization
-
-Avoid collecting:
-
-- location
-- contacts
-- unrelated device information
-- unnecessary identifiers
-
-## De-identification
-
-Automated redaction may remove obvious identifiers.
-
-It must NOT be described as guaranteed anonymization.
-
-## Data Retention
-
-Document exact retention policies before production release (OPEN DECISION OD-006).
-
-Default principle:
-
-keep patient records locally unless cloud storage is explicitly required.
-
-V1 has no cloud storage of patient records (ADR-015). Local records are kept until the clinician deletes them. Deletion and uninstall remove local data; because there is no cloud copy in V1, there is no backup — the clinician must be told this.
-
-## User Controls
-
-The user should be able to:
-
-- delete patient
-- delete visit
-- delete notes
-- delete drafts
-- manage exported data
-- control optional cloud features
-
-Deleting a patient deletes all their visits, transcripts, facts, notes, evidence records and temporary audio.
-
-## Third-Party Providers
-
-Before production:
-
-document:
-
-- provider
-- data sent
-- purpose
-- location/processing
-- retention
-- user-facing disclosure
-- contractual suitability
-
-Use this table (populated when providers are selected):
-
-| Provider | Data sent | Purpose | Processing location | Retention | Disclosure | Contract status |
+| Provider | Data sent | Purpose | Processing location | Retention | User-facing disclosure | Contractual suitability |
 |---|---|---|---|---|---|---|
-| Speech provider (OD-001) | audio stream | transcription, diarization | VERIFY | VERIFY | privacy policy + in-app | VERIFY |
-| LLM provider (OD-002) | transcript text, structured facts | extraction, notes, synthesis | VERIFY | VERIFY | privacy policy + in-app | VERIFY |
-| Evidence providers | clinical concept queries (no identifiers) | evidence retrieval | VERIFY | VERIFY | privacy policy | public APIs, terms review |
-| Backend host (Supabase) | all of the above in transit | proxy, routing | VERIFY | not persisted by ClinNote | privacy policy | VERIFY |
+| Speech provider (OD-001) | audio | transcription, diarization | VERIFY | VERIFY | in-app + privacy policy | VERIFY |
+| LLM provider (OD-002) | text, facts | AI jobs | VERIFY | VERIFY | in-app + privacy policy | VERIFY |
+| Evidence providers | concept queries | evidence | VERIFY | VERIFY | privacy policy | public API terms |
+| Supabase (backend) | in-transit requests | proxy, routing | VERIFY | not persisted by ClinNote | privacy policy | VERIFY |
+| Crash reporting (OD-009) | scrubbed technical data | stability | VERIFY | VERIFY | privacy policy | VERIFY |
 
-## Jurisdiction
+## 8. Analytics
 
-Applicable health-privacy law (e.g. India DPDP Act, US HIPAA, EU GDPR) depends on target markets — OPEN DECISION OD-005. This document states technical requirements that are expected to be necessary under any of them, but compliance with a specific law is not claimed.
+V1 ships with no product analytics. If analytics are added later (ADR required), they must never include transcript, patient identifiers, medications, symptoms, diagnoses, notes, audio or evidence queries.
 
-## Privacy Policy
+## 9. Crash Reporting
 
-A public-facing legal privacy policy must be created separately before Play Store production release.
+Only scrubbed technical data (`SECURITY.md` §17). No clinical content.
 
-This technical document does not itself constitute legal advice or a final public privacy policy.
+## 10. Retention
+
+- Local records: kept until the clinician deletes them. Required retention periods for medical records vary by jurisdiction and institution — OPEN DECISION OD-006 (legal input required). ClinNote does not auto-delete clinical records in V1.
+- Temporary audio: ≤24 hours (ADR-014).
+- Backend: no clinical content retained; technical logs retained for a limited period to be set in OD-006.
+- Provider-side retention: as per provider terms, documented in §7.
+
+## 11. Consent
+
+- Clinician attests consent before recording (ConsentRecord).
+- The app explains what is recorded and where it is processed so the clinician can inform the patient.
+- The app does not determine the legally required form of consent.
+- Withdrawal stops recording; captured content kept or discarded by clinician choice.
+
+## 12. Deletion
+
+The clinician can delete a patient, a visit, notes, drafts, transcripts and temporary audio. Deleting a patient cascades to all related records and files. Exports already shared outside the app cannot be recalled; the export warning states this.
+
+## 13. Export
+
+- Explicit action only, with warning, audited.
+- Exported content is chosen by the clinician (e.g. note only, without transcript).
+
+## 14. Synthetic Development Data
+
+Only synthetic patients, transcripts and audio in development, tests, fixtures, screenshots, store listings and issue reports. Synthetic names are obviously fictional.
+
+## 15. De-identification Limitations
+
+Automated redaction (regex- or API-level) may remove some obvious identifiers. **Regex/API-level redaction does NOT guarantee anonymization.** ClinNote never describes redacted content as anonymous or de-identified in a legal sense. Clinical narratives can contain indirect identifiers (rare conditions, occupations, places, dates).
+
+## 16. User Controls
+
+Delete patient · delete visit · delete notes · delete drafts · manage exports · enable/disable cloud AI · view what is sent to which provider category.
+
+## 17. Privacy Acceptance Criteria
+
+1. No clinical content in logs, analytics or crash reports during the full synthetic E2E suite.
+2. Evidence queries contain no patient identifiers (automated test).
+3. LLM payloads contain no name, DOB or reference (automated test).
+4. Temporary audio absent after success, discard and 24 hours (tests).
+5. Patient deletion removes all related data (test).
+6. In-app processing disclosure shown before first recording.
+7. Provider table (§7) completed with verified terms.
+8. Public privacy policy reviewed by a qualified person and consistent with the Play Data Safety form.

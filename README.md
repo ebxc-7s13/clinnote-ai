@@ -1,211 +1,200 @@
 # ClinNote AI
 
-> Listen. Organize. Review. Remember.
+> **Listen. Organize. Review. Remember.**
 
-ClinNote AI is an Android-first ambient clinical documentation and evidence-review assistant designed for healthcare professionals.
+ClinNote AI is an Android-first ambient clinical documentation and evidence-review assistant for healthcare professionals.
 
-ClinNote captures a clinician-patient consultation after explicit consent, converts the conversation into structured clinical information, maintains a longitudinal patient record, retrieves relevant biomedical and regulatory information, and produces an editable clinical note for clinician review.
+> **Project status:** Documentation phase. No application code exists. ClinNote is not clinically validated and holds no regulatory approval or certification. See `docs/PROJECT-STATUS.md`.
 
-> **Status:** Documentation phase. No application code exists yet. ClinNote is not clinically validated and holds no regulatory approval. See `docs/PROJECT-STATUS.md`.
+---
+
+## Product Purpose
+
+During a consultation a clinician must listen, ask questions, remember answers, document history, medications and investigations, form an assessment and plan, and recall previous visits — all at once. ClinNote reduces that documentation burden without removing clinician control.
+
+ClinNote captures the conversation (after consent), turns it into a speaker-labeled transcript, extracts structured clinical facts with their source, keeps a longitudinal patient record, retrieves source-linked evidence from authoritative biomedical and regulatory sources, and drafts an editable note that the clinician reviews and confirms.
+
+ClinNote is an ambient clinical memory and evidence-review system. It is not an AI doctor.
+
+## Target Users
+
+- doctors
+- dentists
+- specialists
+- outpatient clinicians
+- other healthcare professionals where the workflow is appropriate
+
+V1 is for a single clinician on a single Android device. Patients do not use the app.
 
 ## Core Workflow
 
 ```text
-Patient
-   ↓
-Consultation
-   ↓
-Consent
-   ↓
-Ambient Recording
-   ↓
-Speech-to-Text
-   ↓
-Speaker Diarization
-   ↓
-Clinical Fact Extraction
-   ↓
-Patient Profile
-   ↓
-Evidence Retrieval
-   ↓
-Clinician Review
-   ↓
-Editable Note
-   ↓
-Clinician Confirmation
-   ↓
-Saved Encounter
-   ↓
-Longitudinal Timeline
+CLINICIAN
+↓
+CREATE / SELECT PATIENT
+↓
+CONSENT
+↓
+RECORD
+↓
+SPEECH-TO-TEXT
+↓
+SPEAKER DIARIZATION
+↓
+CLINICAL EXTRACTION
+↓
+PATIENT PROFILE
+↓
+EVIDENCE RETRIEVAL
+↓
+CLINICIAN REVIEW
+↓
+NOTE
+↓
+CONFIRMATION
+↓
+SAVE
+↓
+LONGITUDINAL MEMORY
+↓
+NEXT VISIT
 ```
 
-## Core Product Areas
+Transcription runs live during the consultation; full extraction, evidence retrieval and note generation run after recording stops (ADR-010).
 
-### Ambient Documentation
+## Capabilities
 
-ClinNote can capture a clinician-patient conversation and convert it into a structured transcript.
+What ClinNote does for the clinician, area by area.
 
-### Clinical Information Extraction
+### Patient Profile
 
-ClinNote extracts:
+Each patient is identified by an internal reference such as `P-000001`. Name and date of birth are optional. The profile holds history, allergies, medications, active problems, clinician-confirmed diagnoses, investigations, follow-ups and the visit timeline.
 
-- symptoms
-- symptom duration
-- severity
-- relevant history
-- medications
-- allergies
-- vital signs
-- investigations
-- examination findings
-- assessments explicitly stated
-- plans explicitly stated
-- follow-up information
+### Encounters
 
-### Longitudinal Patient Memory
+Each visit records consent, transcript, speaker segments, clinical facts, possibilities to review, evidence, notes with version history, and an audit trail.
 
-Each patient can have multiple encounters.
+### Longitudinal Timeline
 
-ClinNote can compare:
+Visits accumulate into a timeline of symptoms, medications, investigations, confirmed assessments and follow-ups, so the clinician sees what changed since last time.
 
-- symptoms
-- medications
-- investigations
-- assessments
-- follow-up
-- other explicitly documented information
+### Ambient Speech
 
-across visits.
+After the clinician confirms consent, ClinNote records the consultation and streams it to a cloud speech provider for live transcription. Raw audio is temporary and deleted after processing.
 
-### Evidence Review
+### Speaker Diarization
 
-ClinNote can search authoritative sources such as:
+The transcript is separated into speakers and mapped to roles — DOCTOR, PATIENT, OTHER, UNKNOWN. The clinician can correct the mapping. ClinNote does not identify people by voice and stores no voiceprints.
 
-- FDA/openFDA
-- Drugs@FDA
-- DailyMed
-- RxNorm
-- PubMed
-- Europe PMC
-- MedlinePlus
-- ClinicalTrials.gov
-- NLM Clinical Tables
-- PubChem
-- WHO resources
-- NCI resources
+### Clinical Fact Extraction
 
-The exact production source set will be verified against current official API documentation before implementation.
+Symptoms, duration, severity, history, medications, allergies, vital signs, investigations, examination findings, and explicitly stated assessments, plans and follow-ups are extracted. Every fact records what was said (NOT_DISCUSSED / NEGATIVE / POSITIVE / UNKNOWN), who said it (provenance), and whether the clinician has confirmed it. "Not discussed" is never turned into "negative".
 
-### Clinician Control
+### Evidence Retrieval
 
-AI-generated information remains provisional until a clinician reviews and confirms it.
+ClinNote queries authoritative sources — openFDA, Drugs@FDA, DailyMed, RxNorm, PubMed, Europe PMC, MedlinePlus, ClinicalTrials.gov, NLM Clinical Tables, PubChem, WHO and NCI resources. Every evidence item shows its source, identifier, dates and retrieval time. Citations are never generated by AI. Each provider is verified against current official documentation before integration.
 
-## Clinical Safety Position
+### Medication Intelligence
 
-ClinNote does not replace a clinician.
+Mentioned medications keep their raw wording, are normalized with RxNorm, and are linked to label and regulatory information. Ambiguous names show all candidates. ClinNote never suggests doses, substitutions or changes.
 
-The initial product must not autonomously:
+### Clinician Review
 
-- diagnose patients
-- prescribe treatment
-- change medication dosage
-- confirm disease
-- create undocumented clinical findings
+Instead of diagnoses, ClinNote shows **Possibilities to review**, each with why it surfaced, supporting facts, contradicting facts, missing information and evidence. No probability scores.
 
-The system should present relevant possibilities and evidence for clinician review.
+### Note Generation
 
-## Privacy Position
+SOAP, general and progress notes are drafted from the reviewed facts, edited freely, versioned, and finalized only by the clinician.
 
-ClinNote follows a local-first and minimum-data architecture.
+### Follow-Up
 
-Development must use synthetic data.
+Follow-up tasks stated in the visit are tracked and surfaced on the home screen and at the next visit. AI cannot mark a follow-up complete.
 
-The system should avoid unnecessary collection of patient-identifying information.
+## Privacy Philosophy
 
-## Development Strategy
+- Local-first: patient records stay on the device.
+- Minimum data: a patient reference is enough.
+- Temporary audio, deleted after processing.
+- Only the data needed is sent to cloud providers; evidence queries contain clinical concepts, never identifiers.
+- No clinical content in logs, analytics or crash reports.
+- Synthetic data only during development.
+- Automated redaction is never described as anonymization.
 
-The project is intentionally documentation-first.
+## Clinical-Safety Boundary
 
-Implementation begins only after:
+ClinNote does not replace a clinician. V1 must not autonomously diagnose, prescribe, change doses, triage emergencies, confirm disease, or create findings that were not documented. AI output is provisional until the clinician confirms it.
 
-- product requirements are documented
-- architecture is documented
-- API providers are documented
-- clinical-safety rules are documented
-- privacy requirements are documented
-- data structures are documented
-- testing requirements are documented
-- deployment requirements are documented
+## Architecture
 
-Contributors (human or AI) must read `CLAUDE.md` before making changes.
+```text
+ANDROID APP (React Native + Expo, TypeScript)
+↓
+LOCAL DOMAIN / STORAGE (SQLite, on device — system of record)
+↓
+SECURE API LAYER (serverless backend — holds keys, validates, routes; stores no clinical content)
+↓
+PROVIDER ADAPTERS (speech, LLM, evidence, terminology)
+```
+
+See `docs/ARCHITECTURE.md`.
 
 ## Documentation Map
 
 | Document | Purpose |
 |---|---|
-| `CLAUDE.md` | Repository rules for all contributors |
-| `docs/PRODUCT_SPEC.md` | Product authority |
-| `docs/BUILD_PLAN.md` | Implementation order |
-| `docs/ARCHITECTURE.md` | Architecture authority |
-| `docs/API_CATALOG.md` | External provider registry |
-| `docs/DATA_MODEL.md` | Domain entities and enums |
+| `CLAUDE.md` | Repository rules for all contributors (human or AI) |
+| `docs/PRODUCT_SPEC.md` | Product behavior — product authority |
+| `docs/BUILD_PLAN.md` | Phase-by-phase implementation order |
+| `docs/ARCHITECTURE.md` | System architecture — architecture authority |
+| `docs/API_CATALOG.md` | External provider registry and verification status |
+| `docs/DATA_MODEL.md` | Entities, relationships, enums, state machines |
 | `docs/SPEECH.md` | Recording, transcription, diarization |
-| `docs/AI.md` | LLM usage, prompts, validation |
-| `docs/EVIDENCE-SOURCES.md` | Evidence hierarchy and sources |
-| `docs/SECURITY.md` | Security requirements |
-| `docs/PRIVACY.md` | Privacy requirements |
-| `docs/CLINICAL-SAFETY.md` | Clinical safety boundaries |
-| `docs/UI-UX.md` | Interface specification |
-| `docs/TESTING.md` | Testing strategy |
-| `docs/DEPLOYMENT.md` | Build, backend, CI/CD |
+| `docs/AI.md` | AI jobs, validation, hallucination control |
+| `docs/EVIDENCE-SOURCES.md` | Evidence hierarchy and source rules |
+| `docs/SECURITY.md` | Security requirements and acceptance criteria |
+| `docs/PRIVACY.md` | Technical privacy specification |
+| `docs/CLINICAL-SAFETY.md` | Clinical safety boundaries and test matrix |
+| `docs/UI-UX.md` | Screen specifications |
+| `docs/TESTING.md` | Testing strategy and synthetic scenarios |
+| `docs/DEPLOYMENT.md` | Environments, builds, CI/CD, rollback |
 | `docs/GOOGLE-PLAY.md` | Play Store preparation |
-| `docs/PROJECT-STATUS.md` | Current status |
-| `docs/BUILD_REPORT.md` | Phase build reports |
-| `docs/DECISIONS.md` | Architectural decisions and open decisions |
+| `docs/PROJECT-STATUS.md` | Current phase and status |
+| `docs/BUILD_REPORT.md` | Factual report of the latest phase |
+| `docs/DECISIONS.md` | Architecture decisions and open decisions |
 
-## Project Status
+## Implementation Stages
 
-See:
+| Phase | Name |
+|---|---|
+| 0 | Documentation |
+| 1 | Repository Foundation |
+| 2 | Expo and Android Foundation |
+| 3 | UI System |
+| 4 | Local Database |
+| 5 | Patient System |
+| 6 | Visit System |
+| 7 | Recording |
+| 8 | Speech |
+| 9 | Speaker Diarization |
+| 10 | Clinical Extraction |
+| 11 | Medication Intelligence |
+| 12 | Evidence Engine |
+| 13 | AI Reasoning |
+| 14 | Clinical Review |
+| 15 | Note Generation |
+| 16 | Longitudinal Memory |
+| 17 | Follow-Up |
+| 18 | Export |
+| 19 | Security |
+| 20 | Privacy |
+| 21 | Testing |
+| 22 | Performance |
+| 23 | Android Build |
+| 24 | Google Play |
+| 25 | Final Release Audit |
 
-`docs/PROJECT-STATUS.md`
-
-## Implementation Plan
-
-See:
-
-`docs/BUILD_PLAN.md`
-
-## Architecture
-
-See:
-
-`docs/ARCHITECTURE.md`
-
-## Safety
-
-See:
-
-`docs/CLINICAL-SAFETY.md`
-
-## Privacy
-
-See:
-
-`docs/PRIVACY.md`
-
-## Security
-
-See:
-
-`docs/SECURITY.md`
-
-## Evidence Sources
-
-See:
-
-`docs/EVIDENCE-SOURCES.md`
+Details: `docs/BUILD_PLAN.md`.
 
 ## License
 
-The final licensing strategy is an OPEN DECISION (see `docs/DECISIONS.md`, OD-010) and must be documented before public release. Until then, no license is granted.
+No license is granted yet. The licensing decision is OPEN DECISION OD-010 in `docs/DECISIONS.md`.

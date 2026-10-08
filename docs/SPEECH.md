@@ -1,189 +1,168 @@
 # ClinNote AI — Speech Architecture
 
-## Objective
+How ClinNote turns consultation audio into a speaker-labeled transcript.
 
-Convert a real clinician-patient conversation into a speaker-labeled transcript without requiring manual typing.
+## 1. Objective
 
-## Pipeline
+Convert a clinician-patient conversation into a speaker-labeled, timestamped transcript without manual typing, using cloud speech APIs (no local model downloads — ADR-002, ADR-003).
+
+## 2. Pipeline
 
 ```text
 Microphone
-   ↓
-Audio Stream
-   ↓
-Voice Activity Detection / Speech Segmentation
-   ↓
-Speech Recognition
-   ↓
-Speaker Diarization
-   ↓
-Speaker Role Mapping
-   ↓
-Timestamped Transcript
-   ↓
-Clinical Extraction
+→ Consent gate (ConsentRecord CONFIRMED)
+→ Audio capture (app-private temporary storage)
+→ Audio stream
+→ Voice Activity Detection / segmentation (provider-side or lightweight library)
+→ Speech recognition (STT)
+→ Speaker diarization
+→ Speaker role mapping (proposal → clinician confirmation)
+→ Live transcript (display)
+→ Final transcript (post-consultation pass)
+→ Clinician correction
+→ Clinical extraction (`AI.md`)
 ```
 
-Voice activity detection and segmentation are expected to be performed by the speech provider or by lightweight platform/library code. No speech or VAD model weights are downloaded (ADR-002).
+## 3. Microphone
 
-## Speaker Roles
+- Permission `RECORD_AUDIO` requested at first recording with a plain-language rationale.
+- Denial → manual mode with instructions to enable later.
+- Audio source: device microphone or connected headset/Bluetooth device; device changes pause recording and notify the clinician.
+- Recording state always visible (`UI-UX.md` Live Recording).
+- Background/screen-off behavior: Android requires a microphone-type foreground service with a persistent notification for recording outside the foreground. VERIFY BEFORE IMPLEMENTATION against current Android/Expo docs; record approach as an ADR in BUILD_PLAN Phase 7. Until then: recording pauses when the app leaves the foreground.
 
-DOCTOR
+## 4. Consent
 
-PATIENT
+Recording starts only after the clinician attests that the required consent was obtained according to applicable law, institutional policy and clinical workflow. This creates a ConsentRecord (CONFIRMED). The app does not decide what consent is legally required.
 
-OTHER
+Withdrawal stops recording immediately; the clinician chooses whether to keep or discard what was captured.
 
-UNKNOWN
+## 5. Audio Stream
 
-The system does not need to determine the civil identity of a speaker from their voice.
+- Audio is captured in chunks and streamed to the speech provider using a short-lived token issued by the backend, or through a backend proxy if the provider has no token mechanism (`ARCHITECTURE.md` §3.5). Long-lived keys never reach the device.
+- Chunks are buffered in app-private storage for the final pass and for recovery after network loss.
 
-The goal is role separation.
+## 6. Temporary Audio
 
-No voiceprints or speaker-identification biometrics are created or stored.
+Raw audio is not retained permanently (ADR-014):
 
-### Speaker Role Mapping
+- deleted after the final transcript succeeds
+- deleted when the visit is discarded
+- deleted after at most 24 hours regardless of outcome
+- kept longer only if the clinician explicitly opts in for that visit (off by default)
+- never in logs, analytics, crash reports, backups exported by the app, or shared storage
 
-Diarization produces anonymous speaker labels (e.g. Speaker A, Speaker B). Mapping to roles:
+## 7. Voice Activity Detection
 
-1. A heuristic or AI step proposes a mapping (e.g. the speaker who asks most questions → DOCTOR).
-2. The proposed mapping is shown to the clinician, who can correct it with one action per speaker.
-3. Until confirmed, uncertain segments use UNKNOWN.
+VAD/segmentation is handled by the provider's streaming endpoint where available. If client-side silence detection is needed (e.g. to avoid streaming long silences), it must be a lightweight library without model downloads. VBI.
 
-Role mapping matters clinically: PATIENT_REPORTED vs CLINICIAN_STATED provenance depends on it (`DATA_MODEL.md`).
+## 8. Speech-to-Text
 
-## Consent
+### 8.1 Live Transcript
 
-Recording must not start until the clinician indicates that the required consent has been obtained according to applicable law, institutional policy, and clinical workflow.
+Purpose: immediate feedback. Segments `isFinal=false`. Low-confidence words are visibly marked. Not used for extraction.
 
-The app records this as a `ConsentRecord` (`DATA_MODEL.md`). The app does not determine what consent is legally required; that remains the clinician's responsibility.
+### 8.2 Final Transcript
 
-The user must always see that recording is active.
+Purpose: extraction, note generation, evidence queries, permanent record. Produced after stop by the provider's higher-accuracy (pre-recorded/async) processing where practical. Final segments replace live segments.
 
-## Android Recording Constraints
+## 9. Speaker Diarization
 
-- Permission: `RECORD_AUDIO`, requested only when the clinician first starts a recording.
-- If recording must continue while the app is in the background or the screen is off, Android requires a foreground service of type microphone with a persistent notification, plus the corresponding manifest permissions and Play Console declarations. VERIFY BEFORE IMPLEMENTATION against current Android and Expo documentation; record the chosen approach as an ADR in Phase 5.
-- V1 default: recording runs while the visit screen is active; leaving the screen or backgrounding pauses or continues per the verified approach, and the state is always visible.
+Produces anonymous labels (Speaker A, B, …) per segment. Some providers diarize only in post-recording processing; that is acceptable because extraction runs post-consultation (ADR-010). Live display may show "Speaker A/B" or no labels.
 
-## Temporary Audio
+## 10. Speaker Role Mapping
 
-Raw audio should not be permanently stored by default.
+Roles:
 
-Where temporary storage is unavoidable (e.g. buffering during network loss, final-transcript pass):
+| Role | Meaning |
+|---|---|
+| DOCTOR | the clinician (any profession) |
+| PATIENT | the patient |
+| OTHER | companion, interpreter, other staff |
+| UNKNOWN | not determined |
 
-- minimize duration
-- protect access (app-private storage only, never shared/external storage)
-- delete after successful processing
-- delete when the visit is discarded
-- enforce a maximum temporary retention (default 24 hours, ADR-012) after which audio is deleted even if processing did not succeed
-- do not place audio in logs
-- do not send audio to analytics
-- do not include audio in crash reports
+Process:
 
-Retaining audio beyond this requires an explicit clinician choice per visit (`PRIVACY.md`, Audio). This option is disabled by default.
+1. A deterministic heuristic proposes roles (e.g. speaker asking most questions → DOCTOR).
+2. The clinician sees the proposal after recording and confirms or corrects with one tap per speaker.
+3. Segments without a confirmed role remain UNKNOWN; facts from them carry provenance TRANSCRIPTION, not PATIENT_REPORTED/CLINICIAN_STATED (`DATA_MODEL.md` §3.2).
 
-## Provider Strategy
+ClinNote does not perform civil-identity recognition from voice and does not create or store biometric voiceprints in V1.
 
-Potential providers:
+## 11. Correction
 
-AssemblyAI
+The clinician can edit final transcript text and speaker roles. Edits set `editedByClinician`, create AuditEvents, and mark downstream facts from changed segments for re-review.
 
-Deepgram
+## 12. Recovery
 
-OpenAI
+| Situation | Behavior |
+|---|---|
+| Network loss | Live transcript stops; banner; audio continues buffering locally (≤24 h); final pass runs when network returns |
+| Provider error/timeout | Retry; fallback provider if configured; else manual |
+| App killed | Recorder state persisted; on reopen offer to finalize from buffered audio |
+| Phone call | Recording pauses; resumes on clinician action |
+| Bluetooth mic disconnect | Pause and notify |
+| Empty transcript | Inform clinician; offer manual entry |
+| Partial transcript | Keep what exists; mark stage PARTIAL |
+| Low confidence | Mark words; never auto-correct medical terms silently |
+| Speaker uncertainty | UNKNOWN role |
 
-Gemini
+Transcript captured so far is never discarded by a failure.
 
-The exact production provider will be selected (OPEN DECISION OD-001) after:
+## 13. Cloud API Architecture
 
-- quality testing
-- latency testing
-- Android compatibility testing
-- pricing review
-- privacy review
-- data-processing review
-- language support review (OD-007)
+```text
+App recorder → (short-lived token) → Speech provider streaming endpoint → live segments → App
+App (after stop) → Backend /speech/finalize → Speech provider async endpoint → final segments + diarization → App
+```
 
-All providers are accessed through `SpeechProvider` (and `DiarizationProvider` where separate). Private keys stay on the backend; streaming uses short-lived tokens or a backend proxy (`ARCHITECTURE.md` Section 4).
+All via the `SpeechProvider` / `DiarizationProvider` interfaces. Every call records a ProviderExecution (no content).
 
-## Live vs Final Transcript
+## 14. Candidate Provider Comparison
 
-LIVE TRANSCRIPT
+Selection is OPEN DECISION OD-001. The table records what must be evaluated; no claims are made until verified with official documentation and synthetic tests.
 
-Purpose:
+| Criterion | AssemblyAI | Deepgram | OpenAI | Gemini |
+|---|---|---|---|---|
+| Accuracy (medical vocabulary) | evaluate | evaluate | evaluate | evaluate |
+| Latency (live) | evaluate | evaluate | evaluate | likely final-pass only — VBI |
+| Streaming | offered — VBI | offered — VBI | realtime API — VBI | VBI |
+| Diarization | offered — VBI live vs post | offered — VBI | VBI | via prompt — VBI reliability |
+| Cost | VBI | VBI | VBI | VBI |
+| Privacy (retention, training, region) | VBI | VBI | VBI | VBI (tier-dependent) |
+| Android support (client token / WebSocket from RN) | VBI | VBI | VBI | via backend |
 
-- show current conversation
-- provide immediate feedback
+Evaluation method: the same set of synthetic consultations (scripted, read by volunteers who consent, no real patients) with reference transcripts; measure word error rate on medical terms, negation preservation, speaker attribution accuracy, latency, cost per hour.
 
-FINAL TRANSCRIPT
+Recommended architecture regardless of choice: one streaming provider for live display, optionally a different provider for the final pass if it is materially more accurate.
 
-Purpose:
+## 15. Fallback Strategy
 
-- downstream clinical extraction
-- note generation
-- evidence query generation
-- permanent encounter record
+```text
+STT_PRIMARY → STT_FALLBACK (if configured and verified) → manual entry
+```
 
-Where practical, the final transcript should undergo a higher-quality final processing step.
+Fallback switching happens on the backend via routing configuration; the app is unaware of which provider served the request except through ProviderExecution metadata.
 
-Live segments have `isFinal = false`; they are replaced by final segments once available. The clinician can edit the final transcript; edits are recorded as AuditEvents.
+## 16. Languages
 
-## Speech Failure Modes
+Supported consultation languages are OPEN DECISION OD-007 (English, regional languages, code-mixed speech). Provider language support must be verified before OD-001 is decided.
 
-Handle:
+## 17. Clinical Safety
 
-- microphone permission denial
-- recognizer unavailable
-- network loss
-- provider failure
-- timeouts
-- empty transcript
-- partial transcript
-- low confidence
-- speaker uncertainty
-- application interruption
-- phone call interruption
-- Bluetooth microphone failure
+Speech recognition must not silently turn uncertain speech into a confident fact.
 
-In every case: the transcript captured so far is persisted, the clinician is told what happened, and manual entry remains available (`ARCHITECTURE.md` Section 8).
+| Audio | Required handling |
+|---|---|
+| "maybe metformin?" | remains uncertain (UNKNOWN / hedged), not a confirmed medication |
+| "patient denies chest pain" | negation preserved → NEGATIVE |
+| "history of diabetes" | POSITIVE; must not become "no diabetes" |
+| mumbled dose | `[unclear]`, no guessed number |
 
-## Clinical Safety
+## 18. Development
 
-Speech recognition must not silently turn uncertain speech into a confident medical fact.
+Synthetic audio and synthetic transcripts only. No real patient recordings in the repository, tests or issue trackers. Audio files are excluded by `.gitignore`.
 
-Examples:
+## 19. Model Downloads
 
-Audio:
-
-"maybe metformin?"
-
-should remain uncertain.
-
-Audio:
-
-"patient denies chest pain"
-
-must preserve the negation.
-
-Audio:
-
-"history of diabetes"
-
-must not become:
-
-"no diabetes."
-
-Low-confidence words are displayed as `[unclear]` or visibly flagged (`CLINICAL-SAFETY.md`, Uncertainty).
-
-## Development
-
-Use synthetic audio and synthetic transcripts.
-
-Do not place real patient recordings into the repository.
-
-## Model Downloads
-
-No large speech-model downloads are required for the initial architecture.
-
-Use APIs/cloud services.
+None. No Whisper, diarization or VAD models are downloaded.
