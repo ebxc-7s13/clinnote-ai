@@ -1,0 +1,9 @@
+{
+  "name": "clinnote-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "../mobile/node_modules/.bin/tsc -p tsconfig.json"
+  }
+}

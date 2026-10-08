@@ -50,6 +50,12 @@ class SecretGuardTests(unittest.TestCase):
         code, _ = run("secret_guard.py", {"tool_name": "Write", "tool_input": {"file_path": "/w/.env", "content": "A=1"}})
         self.assertEqual(code, 2)
 
+    def test_empty_key_line_followed_by_other_variable_allowed(self):
+        # an empty KEY= line must not match across the newline into the next variable name (fixed 2026-10-08)
+        content = "GEMINI" + "_API_KEY=\nGEMINI_TEXT_MODEL_NAME_LONG=x\n"
+        code, _ = run("secret_guard.py", {"tool_name": "Write", "tool_input": {"file_path": "/w/.env.example", "content": content}})
+        self.assertEqual(code, 0)
+
     def test_env_example_allowed(self):
         code, _ = run("secret_guard.py", {"tool_name": "Write", "tool_input": {"file_path": "/w/.env.example", "content": "GEMINI_API_KEY="}})
         self.assertEqual(code, 0)

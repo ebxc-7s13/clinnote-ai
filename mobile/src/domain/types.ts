@@ -281,7 +281,7 @@ export const NoteVersion = z.object({
   versionNumber: z.number().int(),
   noteType: NoteType,
   content: z.string(),
-  source: z.enum(['AI_DRAFT', 'MANUAL_DRAFT', 'CLINICIAN_EDIT', 'CLINICIAN_FINALIZED']),
+  source: z.enum(['SYSTEM_DRAFT', 'AI_DRAFT', 'MANUAL_DRAFT', 'CLINICIAN_EDIT', 'CLINICIAN_FINALIZED']),
   createdAt: z.string(),
   aiJobVersion: z.string().optional(),
 });

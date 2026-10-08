@@ -1,0 +1,6 @@
+# Supabase project config for the ClinNote backend (Edge Functions only; no database tables hold clinical data).
+[functions.clinnote-ai]
+verify_jwt = true
+
+[functions.clinnote-transcribe]
+verify_jwt = true

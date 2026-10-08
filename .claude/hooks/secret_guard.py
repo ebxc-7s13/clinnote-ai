@@ -14,8 +14,8 @@ SECRET_PATTERNS = [
     (r"\bsk-(?:ant-|proj-)?[A-Za-z0-9_\-]{20,}", "OpenAI/Anthropic-style secret key"),
     (r"\bhf_[A-Za-z0-9]{30,}", "Hugging Face token"),
     (r"-----BEGIN (?:RSA |EC |OPENSSH |)PRIVATE KEY-----", "private key block"),
-    (r"\b(?:OPENAI|GEMINI|ASSEMBLYAI|DEEPGRAM|ANTHROPIC|NCBI|OPENFDA|NCI)_API_KEY\s*[=:]\s*['\"]?[A-Za-z0-9_\-]{16,}", "provider API key assignment"),
-    (r"\bSUPABASE_SERVICE_ROLE_KEY\s*[=:]\s*['\"]?[A-Za-z0-9_\-\.]{20,}", "Supabase service-role key assignment"),
+    (r"\b(?:OPENAI|GEMINI|ASSEMBLYAI|DEEPGRAM|ANTHROPIC|NCBI|OPENFDA|NCI)_API_KEY[ \t]*[=:][ \t]*['\"]?[A-Za-z0-9_\-]{16,}", "provider API key assignment"),
+    (r"\bSUPABASE_SERVICE_ROLE_KEY[ \t]*[=:][ \t]*['\"]?[A-Za-z0-9_\-\.]{20,}", "Supabase service-role key assignment"),
 ]
 
 MODEL_DOWNLOAD_PATTERNS = [
