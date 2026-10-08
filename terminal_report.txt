@@ -95,3 +95,89 @@ DONE (uncommitted, in working tree):
     Tasks A and B completed; C and E in progress when the lead session hit its own session limit.
 NOT DONE: team synthesis + messaging/plan-approval/QG-probe evidence, PROJECT-STATUS finding sections,
   BUILD_REPORT, agent-doc updates, final cross-document audit, commit, push.
+
+===== 2026-10-08T14:05:12Z — Stage A resume: specification reconciliation completed =====
+
+# STAGE A RESUME REPORT
+
+## Repository State
+Start: main @ 63e1a19 (= origin/main), 42 modified + 13 untracked files from interrupted Stage A runs.
+Run-2 task list: A/B/C/E completed, D pending. Gate 6 doc verdict was FAIL (S2-02, S2-14 partial).
+ADR-043 existed but BUILD_PLAN was unaligned; the synthesis cited by 6 docs was missing; PROJECT-STATUS overclaimed (S3-08).
+End: commit 53b1ae4 pushed to origin/main; working tree clean.
+
+## Findings
+F-01 RESOLVED  canonical evidence-before-possibility pipeline; same order in PRODUCT_SPEC, ARCHITECTURE, AI, EVIDENCE-SOURCES, BUILD_PLAN, TESTING (re-verified B2; wording fixed this session)
+F-02 RESOLVED  label display only after the Phase 11 1a validation (ADR-023/039)
+F-03 RESOLVED  on-device sanitizer; patient identifiers never sent (E2-03 wording fixed: API_CATALOG, ARCHITECTURE)
+F-04 RESOLVED  R2 behind default-off flag; US-source labels; OD-011 open for markets
+F-05 RESOLVED  Phase 14/15 success criteria split
+F-06 RESOLVED  single provenance model + layered summary (DATA_MODEL §3); root-origin reset (ADR-043); value grounding/context check (ADR-044)
+F-07 RESOLVED  MEASURED only via manual entry; AI never MEASURED/EXTERNAL_SOURCE/CLINICIAN_CONFIRMED
+F-08 RESOLVED  FactConflict model; CONTEXT_UNCLEAR keep-and-flag (ADR-045)
+F-09 RESOLVED  safety corpus in Phase 6; 21 required areas mapped; CS-01..CS-46 (CS-45, CS-46 added)
+F-10 RESOLVED  finalize != confirm (CS-25); flagged items counted at finalize (ADR-045)
+F-11 RESOLVED  derived views; allergy safety exception in §10.3
+F-12 RESOLVED  onboarding + cloud-processing toggle FRs
+F-13 RESOLVED  deterministic ranking; route table keyed by FactCategory; evidence participation table (DATA_MODEL §4.15)
+F-14 RESOLVED  backend foundation in 7B; backend F-1..F-8 verified resolved (ADR-042, IC-004/013/015/019a/b)
+Evidence: docs/PROJECT-STATUS.md; docs/agent-handoffs/2026-10-08-stage-a-team2-synthesis.md §3. Behavior tests PENDING (no implementation).
+
+## High-Priority Findings
+S2-02 (free model text in notes)          FULLY RESOLVED (ADR-043 + ADR-044 rule 17; safety final)
+S2-14 (model-chosen conceptKey)           FULLY RESOLVED (ADR-044 rule 16; DATA_MODEL §4.5/§6 r19)
+S4-01 = E4-01 (hypothetical/other-person/question leak)  FULLY RESOLVED (ADR-044 d5, rule 19)
+P4-01 (unchecked "not discussed" marker)  FULLY RESOLVED (ADR-045 d1, rule 20, CS-04 D)
+S6-01 (flagged allergy hidden)            FULLY RESOLVED (ADR-045 allergy exception, §3.3a/§10.3)
+
+## Task Status
+A, B, C, E (run 2): completed (verified). C2, B2, A2 (resume): completed. D (integration conclusion): COMPLETED.
+
+## Open Decisions
+OPEN: OD-001 speech (Phase 8), OD-002 LLM (Phase 10), OD-006 retention (Phase 20), OD-007 languages (before Phase 8),
+      OD-010 license, OD-011 target markets (Phase 11), OD-012 caregiver/proxy consultations (NEW, Phase 10)
+RESOLVED FOR PLANNING: OD-003, OD-004, OD-005 (engineering gate R0-R3, NOT a legal determination; formal assessment by a
+      qualified regulatory professional/counsel engaged by the owner before any R2 release, before R3, before Phase 24)
+RESOLVED: OD-008, OD-009
+
+## Quality Gates
+Gate 6: documentation verdict PASS (clinical-safety-engineer, final). Behavior criteria NOT YET APPLICABLE at Phase 0
+(applicable CS set empty per CLINICAL-SAFETY §18a); nothing counted as passing. Gate not weakened (range CS-44 -> CS-46).
+Gates 1-5, 7-10: NOT YET APPLICABLE.
+
+## Agent Team
+Spawned: clinical-safety-engineer, evidence-research-engineer, product-clinical-architect (staged; backend not needed).
+Completed: all 3. Released via shutdown_request -> shutdown_approved.
+Limited by session: none this session (runs 1 and 2 were limited earlier).
+Messaging: evidence->safety (reply received); product->evidence (reply received, FR-17.8 revised); lead<->safety 6 rounds.
+Task dependencies: D blocked by A2/B2/C2; hook dependency enforcement verified live after fixing a lookup defect.
+Handoffs: 3 resume handoffs + team2 synthesis. Hook tests 23/23 OK; live probes P1-P4 BLOCKED (P4 after fix).
+
+## Documentation Consistency
+PASS (cross-reference audit: 45 ADRs, 12 ODs, CS-01..CS-46 + CS-16a, 0 broken refs, 0 missing files; specialists' re-checks).
+
+## Application Code
+NOT STARTED
+
+## Model Downloads
+NONE
+
+## Real Patient Data
+NONE
+
+## API Credentials
+NONE ADDED
+
+## Git
+Branch: main
+Status: clean, main == origin/main after push (this report entry is committed and pushed in a follow-up docs commit)
+Commit: docs: complete ClinNote Stage A specification reconciliation
+Commit hash: 53b1ae4
+Push: origin main 63e1a19..53b1ae4
+
+## Remaining Blockers
+None for Phase 1. Future: owner decisions OD-001/002/006/007/010/011/012 and the ADR-025 formal regulatory assessment.
+
+## Next Phase
+PHASE 1 — REPOSITORY / APPLICATION FOUNDATION
+NOT STARTED IN THIS SESSION. Awaits explicit owner authorization.
