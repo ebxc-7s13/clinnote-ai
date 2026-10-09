@@ -294,3 +294,4 @@ ARTIFACT: ~/clinnote-artifacts/release-v1.2.0/ClinNote-1.2.0-arm64-v8a-release.a
 RISKS: npm audit 62 advisories (0 critical; mostly tooling) open; 1.2.0 not tested on a physical phone; release key only in Codespace
 BLOCKERS: repository still PRIVATE (token lacks admin); tag v1.2.0 and GitHub Release NOT created (permission denied in session)
 NEXT ACTION: owner backs up ~/.clinnote-signing/, makes repo public, creates release (commands in docs/BUILD_REPORT.md)
+PUSH (verified): docs commit 32b284f pushed to origin main (e5509db..32b284f).
