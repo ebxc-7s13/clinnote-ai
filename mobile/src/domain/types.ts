@@ -4,7 +4,8 @@
  */
 import { z } from 'zod';
 
-export const SCHEMA_VERSION = 1;
+/** v2 (ADR-050): recording segments, transcript versions, report versions, demographics. v1 documents migrate on read. */
+export const SCHEMA_VERSION = 2;
 
 export const InformationState = z.enum(['NOT_DISCUSSED', 'NEGATIVE', 'POSITIVE', 'UNKNOWN']);
 export type InformationState = z.infer<typeof InformationState>;
@@ -44,6 +45,8 @@ export const FactCategory = z.enum([
   'ASSESSMENT',
   'PLAN',
   'FOLLOW_UP',
+  /** Patient details stated in the consultation (age, occupation, …). Never searched, never inferred (ADR-050). */
+  'DEMOGRAPHIC',
   'OTHER',
 ]);
 export type FactCategory = z.infer<typeof FactCategory>;
@@ -140,6 +143,11 @@ export const FactAttributes = z
     interval: z.string().optional(),
     task: z.string().optional(),
     followUpStatus: z.enum(['PENDING', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
+    // demographic (ADR-050)
+    demographicKind: z.enum(['NAME', 'AGE', 'DATE_OF_BIRTH', 'SEX', 'OCCUPATION', 'EDUCATION', 'LANGUAGE']).optional(),
+    demographicQualifier: z.enum(['CURRENT', 'PREVIOUS']).optional(),
+    /** The stated detail itself ("teacher", "47", "Telugu"), a verbatim sub-span of the value. */
+    demographicValue: z.string().optional(),
   })
   .partial();
 export type FactAttributes = z.infer<typeof FactAttributes>;
@@ -194,6 +202,19 @@ export const TranscriptSegment = z.object({
   isFinal: z.boolean(),
   editedByClinician: z.boolean(),
   sourceProvider: z.string(),
+  /** Recording segment (SEG-xxxx) this utterance belongs to (ADR-050). */
+  recordingSegmentId: z.string().optional(),
+  /** BCP-47 language of the utterance as recognised or selected; never translated in place. */
+  language: z.string().optional(),
+  /** When the utterance was appended to the visit (UTC ISO). */
+  addedAt: z.string().optional(),
+  /** LIVE final, PARTIAL_COMMIT (kept partial), FINAL (cloud pass), MANUAL, SPLIT. */
+  origin: z.enum(['LIVE', 'PARTIAL_COMMIT', 'FINAL', 'MANUAL', 'SPLIT', 'DEMO']).optional(),
+  clinicianMarkedUncertain: z.boolean().optional(),
+  /** Soft exclusion from the canonical transcript (duplicate / merged). The text is kept as evidence. */
+  excluded: z.object({ reason: z.enum(['DUPLICATE', 'MERGED', 'ACCIDENTAL']), at: z.string(), mergedIntoSegmentId: z.string().optional() }).optional(),
+  /** Display hint from reconciliation: same speaker said the same words earlier. Never deletes anything. */
+  possibleRepeatOf: z.string().optional(),
 });
 export type TranscriptSegment = z.infer<typeof TranscriptSegment>;
 
@@ -202,7 +223,12 @@ export const FactConflict = z.object({
   patientId: z.string(),
   visitId: z.string(),
   factIds: z.array(z.string()),
-  conflictType: z.enum(['SELF_CORRECTION', 'SPEAKER_DISAGREEMENT', 'BLANKET_VS_SPECIFIC', 'VALUE_MISMATCH', 'CROSS_VISIT']),
+  conflictType: z.enum(['SELF_CORRECTION', 'SPEAKER_DISAGREEMENT', 'BLANKET_VS_SPECIFIC', 'VALUE_MISMATCH', 'CROSS_VISIT', 'PROFILE_MISMATCH']),
+  /** PROFILE_MISMATCH only: the manually entered patient-profile field and value the transcript disagrees with. */
+  profileField: z.enum(['name', 'age', 'sex', 'occupation', 'preferredLanguage']).optional(),
+  profileValue: z.string().optional(),
+  /** Set by code when the later statement carries an explicit correction cue ("actually", "sorry, I mean"). */
+  explicitCorrection: z.boolean().optional(),
   detectedBy: z.enum(['DETERMINISTIC_RULE', 'AI_JOB']),
   status: z.enum(['OPEN', 'RESOLVED_BY_CLINICIAN', 'DISMISSED_BY_CLINICIAN']),
   proposedCurrentFactId: z.string().optional(),
@@ -318,6 +344,52 @@ export const ProviderExecution = z.object({
 });
 export type ProviderExecution = z.infer<typeof ProviderExecution>;
 
+/** One continuous recording period of a consultation (ADR-050). A visit can hold several. */
+export const RecordingSegment = z.object({
+  recordingSegmentId: z.string(),
+  displayCode: z.string(),
+  index: z.number().int(),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+  status: z.enum(['RECORDING', 'PAUSED', 'COMPLETED']),
+  transcriptionStatus: z.enum(['IN_PROGRESS', 'COMPLETED', 'PARTIAL', 'FAILED', 'EMPTY']),
+  language: z.string(),
+  provider: z.string(),
+  /** Visit recording clock (seconds) when this segment started; utterance times are on this clock. */
+  clockOffsetSec: z.number(),
+  durationSec: z.number(),
+  pauses: z.array(z.object({ pausedAt: z.string(), resumedAt: z.string().optional() })),
+  createdAt: z.string(),
+});
+export type RecordingSegment = z.infer<typeof RecordingSegment>;
+
+export const SegmentRevision = z.object({
+  revisionId: z.string(),
+  segmentId: z.string(),
+  action: z.enum(['TEXT_CORRECTED', 'ROLE_CHANGED', 'SPLIT', 'MERGED', 'EXCLUDED', 'RESTORED', 'MARKED_UNCERTAIN', 'MANUAL_ADDED', 'FINAL_REPLACED_LIVE']),
+  previousText: z.string().optional(),
+  previousRole: SpeakerRole.optional(),
+  transcriptVersion: z.number(),
+  at: z.string(),
+});
+export type SegmentRevision = z.infer<typeof SegmentRevision>;
+
+/** Stored structured report version (ADR-051). `report` is validated by ClinicalReport in domain/report.ts. */
+export const ReportVersion = z.object({
+  versionId: z.string(),
+  versionNumber: z.number().int(),
+  generatedAt: z.string(),
+  transcriptVersion: z.number(),
+  generator: z.string(),
+  extractionProviders: z.array(z.string()),
+  clinicianEditedFactCount: z.number(),
+  confirmedFactCount: z.number(),
+  currentFactCount: z.number(),
+  unresolvedConflictCount: z.number(),
+  report: z.record(z.string(), z.unknown()),
+});
+export type ReportVersion = z.infer<typeof ReportVersion>;
+
 export const Visit = z.object({
   schemaVersion: z.number(),
   visitId: z.string(),
@@ -360,6 +432,19 @@ export const Visit = z.object({
   audit: z.array(AuditEvent),
   pendingAudioUris: z.array(z.string()),
   updatedAt: z.string(),
+  // ---- v2 (ADR-050/051); defaults keep v1 documents readable
+  recordingSegments: z.array(RecordingSegment).default(() => []),
+  consultationState: z.enum(['OPEN', 'FINALIZED']).default('OPEN'),
+  consultationFinalizedAt: z.string().optional(),
+  /** Incremented on every transcript change (append, edit, split, merge, exclude). */
+  transcriptVersion: z.number().int().default(1),
+  /** Transcript version the current facts were extracted from; undefined = never extracted. */
+  reconciledTranscriptVersion: z.number().int().optional(),
+  lastReconciledAt: z.string().optional(),
+  segmentRevisions: z.array(SegmentRevision).default(() => []),
+  reportVersions: z.array(ReportVersion).default(() => []),
+  /** Sorted concept terms the last automatic evidence search used (refresh hint, ADR-051). */
+  evidenceConceptSignature: z.string().optional(),
 });
 export type Visit = z.infer<typeof Visit>;
 
@@ -382,6 +467,9 @@ export const Patient = z.object({
   dateOfBirth: z.string().optional(),
   age: z.number().int().min(0).max(130).optional(),
   sex: z.enum(['FEMALE', 'MALE', 'OTHER', 'UNKNOWN']).optional(),
+  /** Optional manual profile fields (v2). Stored on this device only, never sent. */
+  occupation: z.string().optional(),
+  preferredLanguage: z.string().optional(),
   isDemo: z.boolean(),
   problems: z.array(ProblemListEntry),
   visitIds: z.array(z.string()),
@@ -409,6 +497,7 @@ export const AppSettings = z.object({
   onboardingVersion: z.number().optional(),
   cloudProcessingEnabled: z.boolean(),
   defaultNoteType: NoteType,
+  /** Default consultation language (registry code, domain/languages.ts). */
   language: z.string(),
   theme: z.enum(['SYSTEM', 'LIGHT', 'DARK']),
   /** R2 development flag (ADR-025). Only selectable in development builds; release builds force OFF. */

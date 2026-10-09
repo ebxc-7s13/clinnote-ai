@@ -3,11 +3,17 @@
  * opened; nothing is overwritten. Compares facts eligible for automatic input only (§3.3a).
  */
 import { isEligible } from './facts';
-import type { ClinicalFact, FactConflict, Visit } from './types';
+import type { ClinicalFact, FactConflict, Patient, Visit } from './types';
+import { languageName } from './languages';
 import { cmp, durationDays } from './text';
 import { newId, nowIso } from './util';
 
-const WITHIN_VISIT = new Set(['SYMPTOM', 'HISTORY_MEDICAL', 'HISTORY_SURGICAL', 'HISTORY_FAMILY', 'HISTORY_SOCIAL', 'MEDICATION', 'ALLERGY', 'ASSESSMENT']);
+const WITHIN_VISIT = new Set(['SYMPTOM', 'HISTORY_MEDICAL', 'HISTORY_SURGICAL', 'HISTORY_FAMILY', 'HISTORY_SOCIAL', 'MEDICATION', 'ALLERGY', 'ASSESSMENT', 'DEMOGRAPHIC']);
+
+/** Explicit self-correction wording. Only with such a cue may a later statement be proposed as the corrected one. */
+export const CORRECTION_CUE = /\b(actually|sorry|i mean|i meant|correction|let me correct|no wait|not \w+ (?:days?|weeks?|months?|years?)|to correct|i was wrong|rather)\b/i;
+
+const NOT_CURRENT = new Set(['PREVIOUS', 'DISCONTINUED']);
 // Symptoms legitimately change between visits (that is a change, not a contradiction).
 const CROSS_VISIT = new Set(['HISTORY_MEDICAL', 'HISTORY_SURGICAL', 'HISTORY_FAMILY', 'MEDICATION', 'ALLERGY']);
 
@@ -22,7 +28,17 @@ function valueMismatch(a: ClinicalFact, b: ClinicalFact): boolean {
     if (da && db && da !== db) return true;
     const fa = a.attributes.frequency?.toLowerCase();
     const fb = b.attributes.frequency?.toLowerCase();
-    return !!(fa && fb && fa !== fb);
+    if (fa && fb && fa !== fb) return true;
+    // "I take metformin" and later "I stopped metformin": a reported status change needs review (ADR-050)
+    const ta = a.attributes.takingStatus;
+    const tb = b.attributes.takingStatus;
+    return !!(ta && tb && ((ta === 'CURRENT' && NOT_CURRENT.has(tb)) || (tb === 'CURRENT' && NOT_CURRENT.has(ta))));
+  }
+  if (a.category === 'DEMOGRAPHIC') {
+    if (a.attributes.demographicKind === 'AGE') return a.attributes.numericValue !== undefined && b.attributes.numericValue !== undefined && a.attributes.numericValue !== b.attributes.numericValue;
+    const x = a.attributes.demographicValue && cmp(a.attributes.demographicValue);
+    const y = b.attributes.demographicValue && cmp(b.attributes.demographicValue);
+    return !!(x && y && x !== y && a.attributes.demographicQualifier === b.attributes.demographicQualifier);
   }
   if (a.category === 'SYMPTOM') {
     const x = a.attributes.duration ? durationDays(a.attributes.duration) : null;
@@ -66,7 +82,9 @@ export function detectConflicts(current: Visit, earlier: Visit[]): FactConflict[
     const pair = [a.factId, b.factId].sort().join('|');
     if (existingPairs.has(pair)) return; // resolved/dismissed pairs are not reopened without a new version
     existingPairs.add(pair);
-    const later = a.createdAt >= b.createdAt ? a : b;
+    // the later statement in the conversation (clock time), not the later-created record
+    const later = (a.sourceStartTime ?? 0) === (b.sourceStartTime ?? 0) ? (a.createdAt >= b.createdAt ? a : b) : (a.sourceStartTime ?? 0) > (b.sourceStartTime ?? 0) ? a : b;
+    const laterText = current.segments.filter((x) => later.sourceSegmentIds.includes(x.segmentId)).map((x) => x.text).join(' ');
     const c: FactConflict = {
       conflictId: newId(),
       patientId: current.patientId,
@@ -76,6 +94,7 @@ export function detectConflicts(current: Visit, earlier: Visit[]): FactConflict[
       detectedBy: 'DETERMINISTIC_RULE',
       status: 'OPEN',
       proposedCurrentFactId: type === 'CROSS_VISIT' ? undefined : later.factId,
+      explicitCorrection: type !== 'CROSS_VISIT' && later.visitId === current.visitId && CORRECTION_CUE.test(laterText) ? true : undefined,
       detectedAt: nowIso(),
     };
     created.push(c);
@@ -108,5 +127,64 @@ export function detectConflicts(current: Visit, earlier: Visit[]): FactConflict[
     }
   }
   current.conflicts.push(...created);
+  return created;
+}
+
+const PROFILE_FIELD: Partial<Record<NonNullable<ClinicalFact['attributes']['demographicKind']>, NonNullable<FactConflict['profileField']>>> = {
+  AGE: 'age',
+  NAME: 'name',
+  OCCUPATION: 'occupation',
+  LANGUAGE: 'preferredLanguage',
+};
+
+/** Value of the manual patient profile for a field, as display text (undefined when not recorded). */
+export function profileValue(p: Patient, field: NonNullable<FactConflict['profileField']>): string | undefined {
+  const v = p[field];
+  return v === undefined || v === null || v === '' ? undefined : String(v);
+}
+
+function sameDetail(field: NonNullable<FactConflict['profileField']>, profile: string, f: ClinicalFact): boolean {
+  if (field === 'age') return Number(profile) === f.attributes.numericValue;
+  const said = cmp(f.attributes.demographicValue ?? f.value).split(' ');
+  const rec = cmp(profile).split(' ');
+  if (field === 'preferredLanguage') {
+    const name = languageName(profile).toLowerCase();
+    return said.includes(name) || rec.some((t) => said.includes(t));
+  }
+  // the stated words all appear in the recorded value, or the other way round ("Demo Patient" vs "Demo Patient (synthetic)")
+  return said.every((t) => rec.includes(t)) || rec.every((t) => said.includes(t));
+}
+
+/**
+ * Patient-profile reconciliation (ADR-050): a stated detail that differs from the manually entered profile opens a
+ * PROFILE_MISMATCH conflict. The profile is never overwritten by code; the clinician decides which value is kept.
+ */
+export function reconcileProfile(v: Visit, patient: Patient): FactConflict[] {
+  const created: FactConflict[] = [];
+  const existing = new Set(v.conflicts.filter((c) => c.conflictType === 'PROFILE_MISMATCH').map((c) => `${c.profileField}|${c.factIds[0]}|${c.profileValue}`));
+  for (const f of v.facts.filter((x) => isEligible(x) && x.category === 'DEMOGRAPHIC' && x.informationState === 'POSITIVE' && x.attributes.demographicQualifier !== 'PREVIOUS')) {
+    const field = f.attributes.demographicKind ? PROFILE_FIELD[f.attributes.demographicKind] : undefined;
+    if (!field) continue;
+    const recorded = profileValue(patient, field);
+    if (recorded === undefined || sameDetail(field, recorded, f)) continue;
+    const key = `${field}|${f.factId}|${recorded}`;
+    if (existing.has(key)) continue;
+    existing.add(key);
+    const c: FactConflict = {
+      conflictId: newId(),
+      patientId: v.patientId,
+      visitId: v.visitId,
+      factIds: [f.factId],
+      conflictType: 'PROFILE_MISMATCH',
+      detectedBy: 'DETERMINISTIC_RULE',
+      status: 'OPEN',
+      profileField: field,
+      profileValue: recorded,
+      detectedAt: nowIso(),
+    };
+    f.conflictIds.push(c.conflictId);
+    created.push(c);
+  }
+  v.conflicts.push(...created);
   return created;
 }

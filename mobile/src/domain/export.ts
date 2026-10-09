@@ -4,8 +4,10 @@
  * conflicts (the note already contains them); possibilities never enter exports (CS-32); no evidence excerpts or
  * AI text is added here. Every export writes an AuditEvent (FR-26.3).
  */
+import { canonicalTranscript } from './consultation';
 import { audit } from './facts';
 import { renderFact } from './note';
+import { renderReportText, type ClinicalReport } from './report';
 import type { NoteVersion, Patient, Visit } from './types';
 import { activeProblems, allergyStatus, currentMedications, pendingFollowUps } from './views';
 import { formatDate, formatDateTime } from './util';
@@ -25,6 +27,8 @@ export interface ExportDoc {
   fileBase: string;
   text: string;
   html: string;
+  /** structured export (report only) */
+  json?: string;
   isDraft: boolean;
 }
 
@@ -85,4 +89,38 @@ export function exportPatientSummary(patient: Patient, visits: Visit[]): ExportD
   const text = lines.join('\n');
   const isDraft = visits.some((v) => !isFinalNote(v));
   return { fileBase: `${patient.patientReference}_summary`, text, html: html(`${patient.patientReference} summary`, text, false, patient.isDemo), isDraft };
+}
+
+export const REPORT_EXPORT_SCHEMA = 'clinnote-report-export@1';
+
+/**
+ * Structured report export (ADR-051). `source` holds what was recorded (profile, recording segments, the
+ * canonical transcript with its excluded utterances and revision history, facts, conflicts); `derived` holds
+ * the code-built report. Possibilities (candidates) and evidence excerpts beyond the report are not exported.
+ */
+export function exportReport(patient: Patient, v: Visit, report: ClinicalReport, versionNumber: number): ExportDoc {
+  const canonical = canonicalTranscript(v);
+  const payload = {
+    schema: REPORT_EXPORT_SCHEMA,
+    exportedAt: new Date().toISOString(),
+    labels: [DRAFT_EXPORT_LABEL, ...(patient.isDemo ? [DEMO_LABEL] : [])],
+    reportVersion: versionNumber,
+    source: {
+      patient: { patientReference: patient.patientReference, name: patient.name, age: patient.age, dateOfBirth: patient.dateOfBirth, sex: patient.sex, occupation: patient.occupation, preferredLanguage: patient.preferredLanguage, isDemo: patient.isDemo },
+      visit: { visitCode: v.visitCode, startedAt: v.startedAt, endedAt: v.endedAt, consultationState: v.consultationState, consultationFinalizedAt: v.consultationFinalizedAt, transcriptVersion: v.transcriptVersion, reconciledTranscriptVersion: v.reconciledTranscriptVersion, mode: v.mode },
+      recordingSegments: v.recordingSegments,
+      transcriptSegments: canonical,
+      excludedTranscriptSegments: v.segments.filter((s) => s.excluded),
+      transcriptRevisions: v.segmentRevisions,
+      clinicalFacts: v.facts,
+      conflicts: v.conflicts,
+      noteVersions: v.noteVersions,
+    },
+    // possibilities never enter exports (CS-32)
+    derived: { report: { ...report, clinicalTopics: { shown: false, note: 'Not included in exports (R2 feature; CS-32).', items: [] } } },
+    audit: v.audit,
+  };
+  audit(v, 'REPORT', v.visitId, 'EXPORTED', 'CLINICIAN', `report version ${versionNumber}`);
+  const text = [DRAFT_EXPORT_LABEL, ...(patient.isDemo ? [DEMO_LABEL] : []), '', renderReportText(report), '', `Report version ${versionNumber} · generated ${formatDateTime(report.generatedAt)}`].join('\n');
+  return { fileBase: `${patient.patientReference}_${v.visitCode}_report_v${versionNumber}_DRAFT`, text, html: html(`${patient.patientReference} ${v.visitCode} report`, text, true, patient.isDemo), json: JSON.stringify(payload, null, 2), isDraft: true };
 }

@@ -33,7 +33,7 @@ export interface TimelineVisit {
 
 function included(f: ClinicalFact): boolean {
   if (!isEligible(f) || f.conceptKey === 'ANY' && f.category !== 'ALLERGY') return false;
-  if (f.category === 'PLAN' || f.category === 'OTHER' || f.category === 'EXAMINATION_FINDING') return false;
+  if (f.category === 'PLAN' || f.category === 'OTHER' || f.category === 'EXAMINATION_FINDING' || f.category === 'DEMOGRAPHIC') return false;
   // only clinician-confirmed assessments enter the longitudinal record view
   if (f.category === 'ASSESSMENT') return f.status === 'CONFIRMED';
   return true;

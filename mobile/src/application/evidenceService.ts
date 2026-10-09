@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 import { audit, isEligible } from '../domain/facts';
-import { buildAutomaticQueries, dedupe, rank, refreshEvidenceStaleness, sanitizeTerm, type Route } from '../domain/evidence';
+import { buildAutomaticQueries, dedupe, evidenceConceptSignature, rank, refreshEvidenceStaleness, sanitizeTerm, type Route } from '../domain/evidence';
 import type { ClinicalFact, EvidenceQuery, EvidenceSource, Patient, Visit } from '../domain/types';
 import { newId, nowIso } from '../domain/util';
 import type { ClinicalStore } from '../infrastructure/storage/clinicalStore';
@@ -154,6 +154,7 @@ export class EvidenceService {
     refreshEvidenceStaleness(v);
     const anyOk = v.evidenceQueries.some((q) => q.origin === 'AUTOMATIC' && (q.state === 'COMPLETED' || q.state === 'NO_RESULTS'));
     v.evidenceState = planned.length === 0 ? 'COMPLETED' : failed.length === 0 ? 'COMPLETED' : anyOk ? 'PARTIAL' : 'FAILED';
+    v.evidenceConceptSignature = evidenceConceptSignature(v, patient);
     audit(v, 'VISIT', v.visitId, 'UPDATED', 'SYSTEM', `evidence ${v.evidenceState}`);
     return { failedRoutes: failed };
   }

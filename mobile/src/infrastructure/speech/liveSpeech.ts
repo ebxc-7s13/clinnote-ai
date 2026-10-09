@@ -5,11 +5,21 @@
  * Optional per-chunk audio files (Android 13+) are reported for the Level 2 final transcription; they are temporary.
  */
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
+import { Platform } from 'react-native';
+import type { DeviceSpeechLocales } from '../../domain/languages';
+import { CONDITIONS, INVESTIGATIONS, MEDICATIONS, SYMPTOMS } from '../../domain/lexicon';
 
 export type SpeechStatus = 'IDLE' | 'LISTENING' | 'RESTARTING' | 'PAUSED' | 'STOPPED' | 'ERROR';
 
+export interface FinalMeta {
+  /** language reported by the recognizer's language detection (API 34+), else the requested language */
+  language: string;
+  /** a partial kept because no final arrived (never lost; confidence 0 marks it unconfirmed) */
+  keptPartial: boolean;
+}
+
 export interface SpeechCallbacks {
-  onFinal(text: string, confidence: number): void;
+  onFinal(text: string, confidence: number, meta?: FinalMeta): void;
   onPartial(text: string): void;
   onStatus(status: SpeechStatus, message?: string): void;
   onAudioFile(uri: string): void;
@@ -33,6 +43,23 @@ export function speechCapabilities(): SpeechCapabilities {
   }
 }
 
+/**
+ * Medical vocabulary the recognizer is biased towards (EXTRA_BIASING_STRINGS, Android 13+; ignored by services
+ * that do not support it). Biasing changes recognition hints only; no transcript text is altered afterwards.
+ */
+export const BIASING_TERMS: string[] = Array.from(new Set([...MEDICATIONS, ...SYMPTOMS, ...CONDITIONS, ...INVESTIGATIONS].filter((t) => t.length > 3))).slice(0, 300);
+
+/** Locales the speech service reports. Returns queryFailed when the device cannot tell (never "supported"). */
+export async function deviceSpeechLocales(): Promise<DeviceSpeechLocales> {
+  const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : Number(Platform.Version) || 0;
+  try {
+    const r = await ExpoSpeechRecognitionModule.getSupportedLocales({});
+    return { locales: r.locales ?? [], installedLocales: r.installedLocales ?? [], apiLevel };
+  } catch {
+    return { locales: [], installedLocales: [], apiLevel, queryFailed: true };
+  }
+}
+
 export async function requestSpeechPermission(): Promise<boolean> {
   try {
     const r = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
@@ -51,12 +78,14 @@ export class LiveSpeechController {
   private consecutiveErrors = 0;
   private onDeviceFailed = false;
   private lastPartial = '';
+  private detected: string | null = null;
+  private partialTimer: ReturnType<typeof setTimeout> | null = null;
   private subs: { remove(): void }[] = [];
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly cb: SpeechCallbacks,
-    private readonly opts: { lang: string; audioDir?: string; filePrefix: string; captureAudio: boolean },
+    private readonly opts: { lang: string; audioDir?: string; filePrefix: string; captureAudio: boolean; autoDetectLocales?: string[]; biasing?: string[] },
   ) {}
 
   private attach() {
@@ -68,12 +97,17 @@ export class LiveSpeechController {
         if (e.isFinal) {
           this.consecutiveErrors = 0;
           this.lastPartial = '';
-          if (best.transcript.trim()) this.cb.onFinal(best.transcript.trim(), best.confidence);
+          if (this.partialTimer) clearTimeout(this.partialTimer);
+          this.partialTimer = null;
+          if (best.transcript.trim()) this.cb.onFinal(best.transcript.trim(), best.confidence, { language: this.language(), keptPartial: false });
           this.cb.onPartial('');
         } else {
           this.lastPartial = best.transcript;
           this.cb.onPartial(best.transcript);
         }
+      }),
+      m.addListener('languagedetection', (e) => {
+        if (e?.detectedLanguage) this.detected = e.detectedLanguage;
       }),
       m.addListener('end', () => {
         if (this.active && !this.paused) this.scheduleRestart(250);
@@ -108,6 +142,10 @@ export class LiveSpeechController {
     ];
   }
 
+  private language(): string {
+    return this.detected ?? this.opts.lang;
+  }
+
   private fail(message: string) {
     this.active = false;
     this.commitPartial();
@@ -127,12 +165,17 @@ export class LiveSpeechController {
     this.chunk += 1;
     const caps = speechCapabilities();
     try {
+      const auto = this.opts.autoDetectLocales?.length ? this.opts.autoDetectLocales : null;
       ExpoSpeechRecognitionModule.start({
         lang: this.opts.lang,
         interimResults: true,
         continuous: true,
         maxAlternatives: 1,
         addsPunctuation: true,
+        contextualStrings: this.opts.biasing,
+        androidIntentOptions: auto
+          ? { EXTRA_ENABLE_LANGUAGE_SWITCH: 'balanced', EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES: auto, EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES: auto }
+          : undefined,
         requiresOnDeviceRecognition: caps.onDevice && !this.onDeviceFailed,
         recordingOptions:
           this.opts.captureAudio && caps.recording && this.opts.audioDir
@@ -156,9 +199,11 @@ export class LiveSpeechController {
   }
 
   private commitPartial() {
+    if (this.partialTimer) clearTimeout(this.partialTimer);
+    this.partialTimer = null;
     if (this.lastPartial.trim()) {
       // partial text is kept rather than lost; confidence 0 marks it as unconfirmed speech
-      this.cb.onFinal(this.lastPartial.trim(), 0);
+      this.cb.onFinal(this.lastPartial.trim(), 0, { language: this.language(), keptPartial: true });
       this.lastPartial = '';
     }
   }
@@ -170,15 +215,27 @@ export class LiveSpeechController {
     this.startSession();
   }
 
+  /**
+   * Pause stops the recognizer, which normally delivers the final result of the speech in progress. The partial
+   * is kept only if that final does not arrive, so a pause never stores the same words twice.
+   */
   pause() {
     this.paused = true;
-    this.commitPartial();
+    if (this.restartTimer) clearTimeout(this.restartTimer);
     this.safeStop();
+    if (this.partialTimer) clearTimeout(this.partialTimer);
+    this.partialTimer = setTimeout(() => this.commitPartial(), 1500);
     this.cb.onStatus('PAUSED');
+  }
+
+  /** Commits a pending partial immediately (used before a segment is finished). */
+  flush() {
+    this.commitPartial();
   }
 
   resume() {
     if (!this.active) return;
+    this.commitPartial();
     this.paused = false;
     this.startSession();
   }

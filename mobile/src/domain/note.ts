@@ -34,6 +34,7 @@ const CATEGORY_LABEL: Record<FactCategory, string> = {
   ASSESSMENT: 'Assessment',
   PLAN: 'Plan',
   FOLLOW_UP: 'Follow-up',
+  DEMOGRAPHIC: 'Patient detail',
   OTHER: 'Other',
 };
 export const categoryLabel = (c: FactCategory) => CATEGORY_LABEL[c];

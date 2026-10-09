@@ -5,7 +5,20 @@
  * extraction call and (R2, flag ON) one possibilities call.
  */
 import { candidatePrecondition, refreshCandidateStaleness, validateCandidates } from '../domain/candidates';
-import { detectConflicts } from '../domain/conflicts';
+import { detectConflicts, reconcileProfile } from '../domain/conflicts';
+import {
+  activeRecordingSegment,
+  appendUtterance,
+  beginRecordingSegment,
+  canonicalTranscript,
+  completeRecordingSegment,
+  finalizeConsultation,
+  markRepetitions,
+  pauseRecordingSegment,
+  replaceRecordingSegmentUtterances,
+  resumeRecordingSegment,
+} from '../domain/consultation';
+import { languageEntry } from '../domain/languages';
 import { refreshEvidenceStaleness } from '../domain/evidence';
 import { extractDeterministic } from '../domain/extraction/deterministic';
 import { AiExtractionOutput } from '../domain/extraction/item';
@@ -65,46 +78,57 @@ export class VisitService {
     audit(v, 'CONSENT', v.visitId, 'CONSENT_RECORDED');
   }
 
-  addLiveSegment(v: Visit, text: string, confidence: number, role: SpeakerRole, start: number, end: number, sourceProvider = 'android-speechrecognizer'): TranscriptSegment {
-    const s: TranscriptSegment = {
-      segmentId: newId(),
-      displayCode: `T-${pad(v.segments.length + 1, 4)}`,
-      speakerId: role === 'DOCTOR' ? 'Live-D' : role === 'PATIENT' ? 'Live-P' : 'Live-?',
-      speakerRole: role,
-      speakerRoleConfirmed: false,
-      text,
-      startTime: start,
-      endTime: end,
-      confidence: confidence <= 0 ? 'LOW' : confidence < 0.6 ? 'MEDIUM' : 'HIGH',
-      rawConfidence: confidence > 0 ? confidence : undefined,
-      isFinal: true,
-      editedByClinician: false,
-      sourceProvider,
-    };
-    v.segments.push(s);
-    return s;
+  /** Appends a recognised utterance to the active recording segment (duplicate-safe, ADR-050). */
+  addLiveSegment(
+    v: Visit,
+    text: string,
+    confidence: number,
+    role: SpeakerRole,
+    start: number,
+    end: number,
+    sourceProvider = 'android-speechrecognizer',
+    opts: { origin?: TranscriptSegment['origin']; language?: string; recordingSegmentId?: string } = {},
+  ): TranscriptSegment | null {
+    return appendUtterance(v, { text, confidence, role, start, end, sourceProvider, origin: opts.origin ?? (sourceProvider === 'demo-script' ? 'DEMO' : undefined), language: opts.language, recordingSegmentId: opts.recordingSegmentId });
   }
 
-  startRecording(v: Visit) {
+  /** Starts (or returns the already active) recording segment. Never resets the visit start time. */
+  startRecording(v: Visit, opts: { language?: string; provider?: string } = {}) {
     if (v.consent?.state !== 'CONFIRMED') throw new Error('Consent must be confirmed before recording.');
-    v.recordingState = 'RECORDING';
-    v.transcriptState = 'IN_PROGRESS';
-    audit(v, 'VISIT', v.visitId, 'RECORDING_STARTED');
+    const seg = beginRecordingSegment(v, { language: opts.language ?? 'en-US', provider: opts.provider ?? 'android-speechrecognizer' });
+    audit(v, 'VISIT', v.visitId, 'RECORDING_STARTED', 'CLINICIAN', seg.displayCode);
+    return seg;
   }
 
-  /** Stop keeps every captured segment; the live transcript is the transcript until a validated final one exists. */
-  stopRecording(v: Visit, durationSec: number) {
-    v.recordingState = 'STOPPED';
-    v.recordingDurationSec = Math.max(v.recordingDurationSec, Math.round(durationSec));
-    v.endedAt = nowIso();
-    v.transcriptState = v.segments.length ? 'COMPLETED' : 'FAILED';
-    v.transcriptSource = v.segments.length ? 'LIVE_DEVICE' : 'NONE';
-    audit(v, 'VISIT', v.visitId, 'RECORDING_STOPPED');
+  pauseRecording(v: Visit, visitClockSec: number) {
+    const s = activeRecordingSegment(v);
+    if (s) pauseRecordingSegment(v, visitClockSec - s.clockOffsetSec);
+  }
+
+  resumeRecording(v: Visit) {
+    resumeRecordingSegment(v);
+  }
+
+  /**
+   * Finishes the current recording segment (not the consultation). Keeps every captured utterance; the live
+   * transcript is the transcript until a validated final one exists. `visitClockSec` is the visit recording clock.
+   */
+  stopRecording(v: Visit, visitClockSec: number) {
+    const s = activeRecordingSegment(v);
+    const done = completeRecordingSegment(v, s ? visitClockSec - s.clockOffsetSec : undefined);
+    if (done) audit(v, 'VISIT', v.visitId, 'RECORDING_STOPPED', 'CLINICIAN', done.displayCode);
+    return done;
+  }
+
+  /** Explicit clinician action; confirms nothing. */
+  finalizeConsultation(v: Visit) {
+    finalizeConsultation(v);
   }
 
   /** Withdrawn consent: recording stops; nothing captured after this point. Existing text stays for the clinician to delete. */
   withdrawConsent(v: Visit) {
     if (v.consent) v.consent.state = 'WITHDRAWN';
+    completeRecordingSegment(v);
     v.recordingState = 'STOPPED';
     audit(v, 'CONSENT', v.visitId, 'CONSENT_WITHDRAWN');
   }
@@ -113,46 +137,67 @@ export class VisitService {
    * Level 2 final transcript with diarization (Gemini via backend). Falls back to the live transcript on any
    * failure; the live transcript is never discarded before a validated replacement exists.
    */
-  async finalTranscription(v: Visit, settings: AppSettings, mergedAudioUri: string | null): Promise<StageOutcome> {
-    v.transcriptState = 'IN_PROGRESS';
-    if (!mergedAudioUri || !this.cloudAllowed(settings, v)) {
-      v.transcriptState = v.segments.length ? 'COMPLETED' : 'FAILED';
-      v.transcriptSource = v.segments.length ? 'LIVE_DEVICE' : 'NONE';
-      return { ok: v.segments.length > 0, message: !this.cloudAllowed(settings, v) ? `${this.cloudReason(settings, v)} The on-device live transcript is used.` : 'No recorded audio was available; the live transcript is used.' };
+  async finalTranscription(v: Visit, settings: AppSettings, mergedAudioUri: string | null, recordingSegmentId?: string): Promise<StageOutcome> {
+    const rs = recordingSegmentId ? v.recordingSegments.find((s) => s.recordingSegmentId === recordingSegmentId) : v.recordingSegments[v.recordingSegments.length - 1];
+    const live = v.segments.filter((s) => !rs || s.recordingSegmentId === rs.recordingSegmentId);
+    const hasAny = v.segments.some((s) => !s.excluded);
+    // the cloud final pass is verified for English only; other languages keep the on-device transcript (ADR-052)
+    const englishOnly = !rs || languageEntry(rs.language)?.finalTranscriptionSupport === 'AVAILABLE_SYNTHETIC_ONLY';
+    if (!mergedAudioUri || !this.cloudAllowed(settings, v) || !englishOnly) {
+      v.transcriptState = hasAny ? 'COMPLETED' : 'FAILED';
+      if (v.transcriptSource === 'NONE' && hasAny) v.transcriptSource = 'LIVE_DEVICE';
+      const message = !this.cloudAllowed(settings, v)
+        ? `${this.cloudReason(settings, v)} The on-device live transcript is used.`
+        : !englishOnly
+          ? 'The cloud final transcript is verified for English only. The on-device transcript in the selected language is kept unchanged.'
+          : 'No recorded audio was available; the live transcript is used.';
+      return { ok: hasAny, message };
     }
+    v.transcriptState = 'IN_PROGRESS';
     const started = Date.now();
     try {
       const r = await this.backend.transcribe(mergedAudioUri);
       const clean = r.segments.filter((s) => typeof s.text === 'string' && s.text.trim());
       if (!clean.length) throw new BackendError('INVALID_RESPONSE', USER_MESSAGES.INVALID_RESPONSE);
-      const roles = proposeRoles(v.segments, clean);
-      const live = v.segments;
-      v.segments = clean.map((s, i) => ({
+      const roles = proposeRoles(live, clean);
+      const offset = rs?.clockOffsetSec ?? 0;
+      const prefix = rs ? `${rs.displayCode}:` : '';
+      const ts = nowIso();
+      const next = clean.map((s) => ({
         segmentId: newId(),
-        displayCode: `T-${pad(i + 1, 4)}`,
-        speakerId: s.speakerLabel || 'spk_?',
+        speakerId: `${prefix}${s.speakerLabel || 'spk_?'}`,
         speakerRole: roles.map[s.speakerLabel] ?? 'UNKNOWN',
         speakerRoleConfirmed: false,
         text: s.text.trim(),
-        startTime: s.start,
-        endTime: s.end,
-        confidence: 'HIGH',
+        startTime: Math.round((offset + s.start) * 10) / 10,
+        endTime: Math.round((offset + s.end) * 10) / 10,
+        confidence: 'HIGH' as const,
         isFinal: true,
         editedByClinician: false,
         sourceProvider: 'gemini-transcribe',
+        recordingSegmentId: rs?.recordingSegmentId,
+        language: rs?.language,
+        addedAt: ts,
+        origin: 'FINAL' as const,
       }));
+      if (rs) replaceRecordingSegmentUtterances(v, rs.recordingSegmentId, next);
+      else v.segments = next.map((s, i) => ({ ...s, displayCode: `T-${pad(i + 1, 4)}` }));
+      if (v.speakerMappingState === 'COMPLETED') v.speakerMappingState = 'PARTIAL';
       v.speakerAssignmentUncertain = roles.uncertain;
       v.transcriptSource = 'GEMINI_FINAL';
       v.transcriptState = 'COMPLETED';
+      if (rs) rs.provider = 'gemini-transcribe';
       this.recordExecution(v, 'transcription', 'SUCCESS', started, r.execution.provider, r.execution.model);
-      audit(v, 'TRANSCRIPT', v.visitId, 'UPDATED', 'SYSTEM', `final transcript replaced ${live.length} live segments`);
+      audit(v, 'TRANSCRIPT', v.visitId, 'UPDATED', 'SYSTEM', `final transcript replaced ${live.length} live utterance(s)${rs ? ` of ${rs.displayCode}` : ''}`);
       return { ok: true };
     } catch (e) {
       const kind = e instanceof BackendError ? e.kind : 'UNAVAILABLE';
       this.recordExecution(v, 'transcription', kind === 'QUOTA_EXHAUSTED' ? 'QUOTA_EXHAUSTED' : kind === 'INVALID_RESPONSE' ? 'VALIDATION_FAILED' : 'UNAVAILABLE', started);
-      v.transcriptState = v.segments.length ? 'PARTIAL' : 'FAILED';
-      v.transcriptSource = v.segments.length ? 'LIVE_DEVICE' : 'NONE';
-      return { ok: false, message: `${USER_MESSAGES[kind as keyof typeof USER_MESSAGES] ?? USER_MESSAGES.UNAVAILABLE} The on-device live transcript is kept.` };
+      v.transcriptState = hasAny ? 'PARTIAL' : 'FAILED';
+      if (rs) rs.transcriptionStatus = live.length ? 'PARTIAL' : 'FAILED';
+      if (v.transcriptSource === 'NONE' && hasAny) v.transcriptSource = 'LIVE_DEVICE';
+      const msg = e instanceof BackendError ? USER_MESSAGES[kind as keyof typeof USER_MESSAGES] : e instanceof Error ? e.message : USER_MESSAGES.UNAVAILABLE;
+      return { ok: false, message: `${msg ?? USER_MESSAGES.UNAVAILABLE} The on-device live transcript is kept.` };
     }
   }
 
@@ -169,8 +214,15 @@ export class VisitService {
   }
 
   // ------------------------------------------------------------- extraction
-  async runExtraction(v: Visit, settings: AppSettings, earlier: Visit[]): Promise<StageOutcome> {
+  /**
+   * Extraction over the complete canonical transcript (every recording segment, chronological, excluded
+   * utterances left out). Also the visit reconciliation: repetition marks, conflicts and patient-profile checks.
+   */
+  async runExtraction(v: Visit, settings: AppSettings, earlier: Visit[], patient?: Patient): Promise<StageOutcome> {
     if (v.speakerMappingState !== 'COMPLETED') return { ok: false, message: 'Confirm the speaker roles first.' };
+    // negation, hedging and grounding rules are English-only: other languages are never auto-extracted (ADR-052)
+    const all = canonicalTranscript(v);
+    const canonical = all.filter((s) => !s.language || s.language.toLowerCase().startsWith('en'));
     v.clinicalExtractionState = 'IN_PROGRESS';
     // Re-run keeps every clinician-touched fact; only untouched provisional extraction output is replaced.
     const kept = v.facts.filter((f) => f.extractor === 'MANUAL' || f.status !== 'PROVISIONAL' || f.supersededByFactId);
@@ -179,20 +231,20 @@ export class VisitService {
     v.facts = kept;
     v.discarded = [];
 
-    const det = validateAndPromote(extractDeterministic(v.segments), v.segments, { patientId: v.patientId, visitId: v.visitId, extractor: 'DETERMINISTIC' });
+    const det = validateAndPromote(extractDeterministic(canonical), canonical, { patientId: v.patientId, visitId: v.visitId, extractor: 'DETERMINISTIC' });
     let facts = mergeFacts(v.facts, det.facts);
     const discarded = [...det.discarded];
     let message: string | undefined;
     let aiOk = true;
 
-    if (this.cloudAllowed(settings, v) && v.segments.length) {
+    if (this.cloudAllowed(settings, v) && canonical.length) {
       const started = Date.now();
       try {
-        const input = { segments: v.segments.map((s) => ({ id: s.segmentId, role: s.speakerRole, text: s.text })) };
+        const input = { segments: canonical.map((s) => ({ id: s.segmentId, role: s.speakerRole, text: s.text })) };
         const r = await this.backend.runJob(JOB_EXTRACTION, JOB_EXTRACTION_VERSION, input);
         const parsed = AiExtractionOutput.safeParse(r.output);
         if (!parsed.success) throw new BackendError('INVALID_RESPONSE', USER_MESSAGES.INVALID_RESPONSE);
-        const ai = validateAndPromote(parsed.data.items, v.segments, { patientId: v.patientId, visitId: v.visitId, extractor: 'AI', aiJobVersion: JOB_EXTRACTION_VERSION, providerExecutionId: r.execution.executionId });
+        const ai = validateAndPromote(parsed.data.items, canonical, { patientId: v.patientId, visitId: v.visitId, extractor: 'AI', aiJobVersion: JOB_EXTRACTION_VERSION, providerExecutionId: r.execution.executionId });
         facts = mergeFacts(facts, ai.facts);
         discarded.push(...ai.discarded);
         this.recordExecution(v, JOB_EXTRACTION, 'SUCCESS', started, r.execution.provider, r.execution.model);
@@ -212,10 +264,16 @@ export class VisitService {
     v.facts = facts;
     v.discarded = discarded;
     detectConflicts(v, earlier);
+    if (patient) reconcileProfile(v, patient);
+    const repeats = markRepetitions(v);
     refreshEvidenceStaleness(v);
     refreshCandidateStaleness(v);
     v.clinicalExtractionState = aiOk ? 'COMPLETED' : 'PARTIAL';
-    audit(v, 'VISIT', v.visitId, 'UPDATED', 'SYSTEM', `extraction ${v.clinicalExtractionState}`);
+    v.reconciledTranscriptVersion = v.transcriptVersion;
+    v.lastReconciledAt = nowIso();
+    const nonEnglish = all.length - canonical.length;
+    if (nonEnglish) message = [message, `${nonEnglish} utterance(s) are not in English. Automatic extraction supports English only; review them in the transcript and add facts manually.`].filter(Boolean).join(' ');
+    audit(v, 'VISIT', v.visitId, 'UPDATED', 'SYSTEM', `extraction ${v.clinicalExtractionState} over ${canonical.length} of ${all.length} utterance(s), transcript v${v.transcriptVersion}${repeats ? `, ${repeats} possible repetition(s)` : ''}`);
     return { ok: true, message };
   }
 
@@ -247,7 +305,7 @@ export class VisitService {
     v.candidateState = 'IN_PROGRESS';
     const started = Date.now();
     try {
-      const facts = v.facts.filter(isEligible).map((f) => ({ id: f.factId, category: f.category, value: f.value, informationState: f.informationState, source: provenanceLabel(f), reviewStatus: f.status }));
+      const facts = v.facts.filter((f) => isEligible(f) && f.category !== 'DEMOGRAPHIC').map((f) => ({ id: f.factId, category: f.category, value: f.value, informationState: f.informationState, source: provenanceLabel(f), reviewStatus: f.status }));
       const evidence = v.evidence.filter((e) => e.citable).map((e) => ({ id: e.evidenceId, title: e.title, sourceType: e.sourceType, excerpt: e.excerpt ?? '' }));
       const r = await this.backend.runJob(JOB_CANDIDATES, JOB_CANDIDATES_VERSION, { facts, evidence });
       const runId = newId();

@@ -157,3 +157,15 @@ export function resolveConflict(v: Visit, conflictId: string, currentFactId: str
   }
   audit(v, 'CONFLICT', conflictId, 'CONFLICT_RESOLVED');
 }
+
+/** Clinician flags a fact as uncertain (needs clarification). Status and provenance are unchanged; confirming clears it. */
+export function markFactUncertain(v: Visit, factId: string): void {
+  const f = v.facts.find((x) => x.factId === factId);
+  if (!f) throw new ReviewError('Fact not found.');
+  if (!isCurrent(f)) throw new ReviewError('Only the current version can be marked.');
+  f.needsClarification = true;
+  if (!f.clarificationReason || f.clarificationReason === 'UNCERTAIN_SPEECH') f.clarificationReason = 'OTHER';
+  // provenance and review status are untouched (ADR-015); the flag alone sends it back to review
+  f.updatedAt = nowIso();
+  audit(v, 'FACT', f.factId, 'MARKED_UNCERTAIN');
+}

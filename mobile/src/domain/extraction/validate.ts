@@ -6,6 +6,7 @@
 import { ExtractionItem, type ExtractorKind } from './item';
 import type { ClinicalFact, DiscardedItem, Provenance, SpeakerRole, TranscriptSegment } from '../types';
 import { CONDITIONS, INFERENTIAL_WORDING, MEDICATIONS, SYMPTOMS, SYNONYMS, canonicalConcept } from '../lexicon';
+import { DEMOGRAPHIC_NEGATION } from './deterministic';
 import { clauseContaining, clauseContext, cmp, isNegatedSpan, isSpan, numbersIn, phrasesIn, tokensGrounded } from '../text';
 import { newId, nowIso } from '../util';
 
@@ -41,6 +42,7 @@ export function computeConceptKey(category: ClinicalFact['category'], value: str
   if ((category === 'ALLERGY' && attrs.substance === 'ANY') || (category === 'MEDICATION' && attrs.rawName === 'ANY')) return { key: 'ANY' };
   if (category === 'ALLERGY' && attrs.substance) return { key: attrs.substance.toLowerCase(), normalized: attrs.substance.toLowerCase() };
   if (category === 'VITAL_SIGN' && attrs.vitalKind) return { key: attrs.vitalKind.toLowerCase() };
+  if (category === 'DEMOGRAPHIC') return { key: attrs.demographicKind ? `demographic:${attrs.demographicKind.toLowerCase()}` : 'UNMAPPED' };
   if (category === 'INVESTIGATION' && attrs.testName) {
     const c = canonicalConcept(attrs.testName) ?? attrs.testName.toLowerCase();
     return { key: c, normalized: c };
@@ -188,7 +190,10 @@ export function validateAndPromote(
         reason = 'HEDGED_STATEMENT';
       }
       if (!cc.hedge) {
-        const negated = isNegatedSpan(clause, item.value) || (spanSeg ? false : texts.some((t) => isNegatedSpan(clauseContaining(t, item.value) ?? t, item.value)));
+        const negated =
+          item.category === 'DEMOGRAPHIC'
+            ? DEMOGRAPHIC_NEGATION.test(item.value) // "No, I'm 47" corrects, it does not negate the age
+            : isNegatedSpan(clause, item.value) || (spanSeg ? false : texts.some((t) => isNegatedSpan(clauseContaining(t, item.value) ?? t, item.value)));
         const blanket = item.attributes.substance === 'ANY' || item.attributes.rawName === 'ANY';
         if (state === 'POSITIVE' && negated && !blanket && item.attributes.takingStatus !== 'DISCONTINUED') {
           discard(item.category, item.sourceSegmentIds, 'NEGATION_MISMATCH');
@@ -206,7 +211,7 @@ export function validateAndPromote(
     }
 
     // rule 18: unclear audio
-    if (cited.some((s) => /\[unclear\]/i.test(s.text) || s.confidence === 'LOW') && !needs) {
+    if (cited.some((s) => /\[unclear\]/i.test(s.text) || s.confidence === 'LOW' || s.clinicianMarkedUncertain) && !needs) {
       needs = true;
       reason = 'UNCERTAIN_SPEECH';
     }

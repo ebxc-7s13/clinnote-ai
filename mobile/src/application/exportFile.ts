@@ -8,7 +8,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { ExportDoc } from '../domain/export';
 
-export type ExportFormat = 'PDF' | 'TEXT';
+export type ExportFormat = 'PDF' | 'TEXT' | 'JSON';
 
 export const EXPORT_WARNING = "This file will leave ClinNote's protected storage. ClinNote cannot delete copies shared with other apps.";
 
@@ -27,6 +27,12 @@ export async function shareExport(doc: ExportDoc, format: ExportFormat): Promise
     file = new File(exportDir(), `${doc.fileBase}.pdf`);
     if (file.exists) file.delete();
     src.moveSync(file);
+  } else if (format === 'JSON') {
+    if (!doc.json) throw new Error('A structured (JSON) export is available for clinical reports only.');
+    file = new File(exportDir(), `${doc.fileBase}.json`);
+    if (file.exists) file.delete();
+    file.create();
+    file.write(doc.json);
   } else {
     file = new File(exportDir(), `${doc.fileBase}.txt`);
     if (file.exists) file.delete();
@@ -34,7 +40,7 @@ export async function shareExport(doc: ExportDoc, format: ExportFormat): Promise
     file.write(doc.text);
   }
   try {
-    await Sharing.shareAsync(file.uri, { mimeType: format === 'PDF' ? 'application/pdf' : 'text/plain', dialogTitle: 'Export from ClinNote' });
+    await Sharing.shareAsync(file.uri, { mimeType: format === 'PDF' ? 'application/pdf' : format === 'JSON' ? 'application/json' : 'text/plain', dialogTitle: 'Export from ClinNote' });
   } finally {
     // the shared copy belongs to the receiving app; ClinNote's temporary copy is removed
     setTimeout(() => {

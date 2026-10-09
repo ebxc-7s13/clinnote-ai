@@ -32,7 +32,60 @@ const FOLLOW_UP_RE =
   /\b(come back|follow[- ]?up|see you(?: again)?|review(?: you)?|return|recheck)\b[^.?!]*?\b(?:in|after|within)\s+((?:\d+|a|one|two|three|four|five|six|a couple of|a few)\s+(?:days?|weeks?|months?))\b/i;
 
 function unclear(seg: TranscriptSegment): boolean {
-  return /\[unclear\]/i.test(seg.text) || seg.confidence === 'LOW';
+  return /\[unclear\]/i.test(seg.text) || seg.confidence === 'LOW' || !!seg.clinicianMarkedUncertain;
+}
+
+/** Occupations accepted after "I'm a …" (anything after "I work as …" is accepted verbatim). */
+const OCCUPATIONS = [
+  'teacher', 'nurse', 'doctor', 'driver', 'farmer', 'engineer', 'student', 'labourer', 'laborer', 'shopkeeper', 'clerk', 'accountant',
+  'cook', 'chef', 'tailor', 'carpenter', 'electrician', 'plumber', 'mechanic', 'police officer', 'soldier', 'lawyer', 'banker', 'pharmacist',
+  'housewife', 'homemaker', 'retired', 'pensioner', 'software engineer', 'developer', 'manager', 'salesman', 'saleswoman', 'cleaner', 'security guard',
+  'construction worker', 'factory worker', 'office worker', 'businessman', 'businesswoman', 'shop owner', 'weaver', 'fisherman', 'painter', 'barber',
+];
+export const DEMOGRAPHIC_NEGATION = /\b(?:not|never|no longer)\b|n't\b/i;
+const OCCUPATION_RE = new RegExp(`\\b(?:i'?m|i am|i was)\\s+(?:an?\\s+|a retired\\s+)?(${[...OCCUPATIONS].sort((a, b) => b.length - a.length).map((o) => o.replace(/\s+/g, '\\s+')).join('|')})\\b`, 'i');
+const LANGUAGES = ['english', 'telugu', 'hindi', 'bengali', 'tamil', 'kannada', 'malayalam', 'urdu', 'marathi', 'gujarati', 'punjabi', 'odia'];
+
+/**
+ * Patient details stated in conversation (ADR-050). Self-reports only from the PATIENT role, statements to the
+ * patient ("you are 47") only from the DOCTOR role. Questions never ground a value; nothing is inferred
+ * (no sex from pronouns, no occupation from context).
+ */
+function demographicItems(seg: TranscriptSegment, clause: string, ctx: ClauseContext): ExtractionItem[] {
+  const out: ExtractionItem[] = [];
+  const role = seg.speakerRole;
+  if (role !== 'PATIENT' && role !== 'DOCTOR') return out;
+  const self = role === 'PATIENT' ? "(?:i'?m|i am)" : "(?:you'?re|you are)";
+  const push = (span: string, kind: NonNullable<ExtractionItem['attributes']['demographicKind']>, detail: string, attrs: ExtractionItem['attributes'] = {}) => {
+    const it = base(seg, 'DEMOGRAPHIC', span.trim());
+    // only a negation inside the statement counts ("I don't work as …"); a leading "No, I'm 47" is a correction
+    it.informationState = ctx.hedge ? 'UNKNOWN' : DEMOGRAPHIC_NEGATION.test(span) ? 'NEGATIVE' : 'POSITIVE';
+    if (it.informationState === 'UNKNOWN') flag(it, 'HEDGED_STATEMENT');
+    it.attributes = { demographicKind: kind, demographicValue: detail.trim(), ...attrs };
+    out.push(it);
+  };
+  // age: "I'm 47", "I turned 47", "47 years old" (patient); "you're 47" / "you are 47 years old" (doctor)
+  const age =
+    clause.match(new RegExp(`\\b${self}\\s+(\\d{1,3})(?:\\s+years?(?:\\s+old)?)?(?=\\s*(?:[.,!?;]|$|and\\b|now\\b|this\\b))`, 'i')) ??
+    (role === 'PATIENT' ? clause.match(/\b(?:i (?:just |recently )?turned|my age is|i'?m aged)\s+(\d{1,3})\b(?:\s+years?(?:\s+old)?)?/i) ?? clause.match(/\b(\d{1,3})\s+years?\s+old\b/i) : null);
+  if (age && Number(age[1]) <= 130) push(age[0], 'AGE', age[1], { numericValue: Number(age[1]), unit: 'years' });
+  if (role === 'PATIENT') {
+    const prev = /\b(used to|retired|former(?:ly)?|previously)\b/i.test(clause);
+    const job =
+      clause.match(/\b(?:i (?:used to )?work(?:ed)? as|i'?m working as|i am working as|my (?:job|occupation|profession) is|i'?m employed as|by profession i'?m)\s+(?:an?\s+)?([a-z]+(?:\s+[a-z]+)?)/i) ??
+      clause.match(OCCUPATION_RE);
+    if (job) {
+      const title = job[1].replace(/\s+(?:and|at|in|for|but)$/i, '').trim();
+      if (title && !/^(?:little|bit|lot|smoker|diabetic|vegetarian)$/i.test(title)) push(job[0].replace(/\s+(?:and|at|in|for|but)$/i, ''), 'OCCUPATION', title, prev ? { demographicQualifier: 'PREVIOUS' } : { demographicQualifier: 'CURRENT' });
+    }
+    const edu = clause.match(/\b(?:in|studying in|i study in|i'?m in)\s+(?:the\s+)?(?:(class|grade|standard|std)\s+(\d{1,2})|(\d{1,2})(?:st|nd|rd|th)\s+(class|grade|standard))\b/i);
+    if (edu) push(edu[0], 'EDUCATION', edu[1] ? `${edu[1]} ${edu[2]}` : `${edu[3]} ${edu[4]}`);
+    const lang = clause.match(new RegExp(`\\b(?:i (?:only |mostly )?(?:speak|prefer|understand)|my (?:first |mother |home )?(?:language|tongue) is)\\s+(${LANGUAGES.join('|')})\\b`, 'i'));
+    if (lang) push(lang[0], 'LANGUAGE', lang[1]);
+    const name = clause.match(/\bmy name is\s+([a-z][a-z'-]+(?:\s+(?!and\b)[a-z][a-z'-]+){0,2})/i);
+    if (name) push(name[0], 'NAME', name[1]);
+  }
+  return out;
 }
 
 function stateFor(ctx: ClauseContext, span: string): ExtractionItem['informationState'] {
@@ -120,6 +173,8 @@ function clauseItems(seg: TranscriptSegment, rawClause: string): ExtractionItem[
     }
     return out;
   }
+
+  out.push(...demographicItems(seg, clause, ctx));
 
   // ---- allergies
   const noAllergy = clause.match(/\b(no (?:known )?(?:drug )?allergies|not allergic to anything|no allergies)\b/i);

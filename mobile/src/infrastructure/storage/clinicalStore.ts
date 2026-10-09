@@ -19,6 +19,7 @@ import {
   type PatientIndexEntry as PatientIndexEntryT,
   type Visit as VisitT,
 } from '../../domain/types';
+import { migrateVisit } from '../../domain/consultation';
 import { newId, nowIso, pad } from '../../domain/util';
 import type { DocumentCipher } from './crypto';
 import type { FileBackend } from './fileBackend';
@@ -132,7 +133,7 @@ export class ClinicalStore {
     await this.writeDoc(`${ROOT}/index.json.enc`, next);
   }
 
-  createPatient(input: Pick<PatientT, 'name' | 'age' | 'sex' | 'dateOfBirth'> & { isDemo?: boolean }): Promise<PatientT> {
+  createPatient(input: Pick<PatientT, 'name' | 'age' | 'sex' | 'dateOfBirth' | 'occupation' | 'preferredLanguage'> & { isDemo?: boolean }): Promise<PatientT> {
     return this.serial(async () => {
       const n = await this.takeNumber('patient');
       const ts = nowIso();
@@ -144,6 +145,8 @@ export class ClinicalStore {
         age: input.age,
         sex: input.sex,
         dateOfBirth: input.dateOfBirth || undefined,
+        occupation: input.occupation?.trim() || undefined,
+        preferredLanguage: input.preferredLanguage || undefined,
         isDemo: input.isDemo ?? false,
         problems: [],
         visitIds: [],
@@ -226,6 +229,11 @@ export class ClinicalStore {
         audit: [{ eventId: newId(), entityType: 'VISIT', entityId: '', action: 'CREATED', actor: 'CLINICIAN', createdAt: ts }],
         pendingAudioUris: [],
         updatedAt: ts,
+        recordingSegments: [],
+        consultationState: 'OPEN',
+        transcriptVersion: 1,
+        segmentRevisions: [],
+        reportVersions: [],
       };
       v.audit[0].entityId = v.visitId;
       await this.writeDoc(`${this.pDir(p.patientReference)}/visits/${v.visitCode}.json.enc`, v);
@@ -243,7 +251,7 @@ export class ClinicalStore {
     const out: VisitT[] = [];
     for (const name of names.filter((n) => n.endsWith('.json.enc'))) {
       const v = await this.readDoc(`${this.pDir(ref)}/visits/${name}`, Visit);
-      if (v) out.push(v);
+      if (v) out.push(migrateVisit(v));
     }
     return out.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   }

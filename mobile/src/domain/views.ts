@@ -3,6 +3,7 @@
  * allergy is never hidden; PROVISIONAL items never become active problems.
  */
 import { isCurrent, isEligible } from './facts';
+import { durationDays } from './text';
 import type { ClinicalFact, Patient, Visit } from './types';
 
 export interface CurrentMedication {
@@ -104,4 +105,16 @@ export function pendingFollowUps(visits: Visit[]) {
 
 export function unreviewedCount(v: Visit): number {
   return v.facts.filter((f) => isCurrent(f) && (f.status === 'PROVISIONAL' || (f.needsClarification && f.clarificationReason !== 'CONFLICT'))).length;
+}
+
+/**
+ * Due date of a follow-up: the clinician-set dueDate, else the stated interval counted from the visit date
+ * (code arithmetic on stated values, labelled approximate). Null when neither was stated — never guessed.
+ */
+export function followUpDue(f: ClinicalFact, v: Visit): { date: string; approximate: boolean } | null {
+  if (f.attributes.dueDate) return { date: f.attributes.dueDate, approximate: false };
+  const days = f.attributes.interval ? durationDays(f.attributes.interval) : null;
+  if (days === null) return null;
+  const d = new Date(new Date(v.startedAt).getTime() + days * 86400000);
+  return { date: d.toISOString().slice(0, 10), approximate: true };
 }

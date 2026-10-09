@@ -47,7 +47,7 @@ const fmtNum = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 export function compareVisits(previous: Visit, current: Visit): DiffItem[] {
   const take = (v: Visit) => {
     const m = new Map<string, ClinicalFact>();
-    for (const f of v.facts.filter((x) => isEligible(x) && x.conceptKey !== 'ANY' && !['PLAN', 'OTHER', 'EXAMINATION_FINDING'].includes(x.category))) {
+    for (const f of v.facts.filter((x) => isEligible(x) && x.conceptKey !== 'ANY' && !['PLAN', 'OTHER', 'EXAMINATION_FINDING', 'DEMOGRAPHIC'].includes(x.category))) {
       m.set(keyOf(f), f); // last statement in the visit wins for display; conflicts are shown separately
     }
     return m;

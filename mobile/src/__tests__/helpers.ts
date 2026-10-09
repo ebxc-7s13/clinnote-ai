@@ -34,7 +34,7 @@ export function extractFull(segments: TranscriptSegment[]) {
 
 export function visit(over: Partial<Visit> = {}): Visit {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     visitId: 'V',
     visitCode: 'V-000001',
     patientId: 'P',
@@ -63,6 +63,11 @@ export function visit(over: Partial<Visit> = {}): Visit {
     audit: [],
     pendingAudioUris: [],
     updatedAt: '2026-10-08T09:00:00.000Z',
+    recordingSegments: [],
+    consultationState: 'OPEN',
+    transcriptVersion: 1,
+    segmentRevisions: [],
+    reportVersions: [],
     ...over,
   };
 }

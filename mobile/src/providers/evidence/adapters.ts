@@ -99,6 +99,7 @@ const FdaLabel = z.object({
       warnings_and_cautions: z.array(z.string()).optional(),
       contraindications: z.array(z.string()).optional(),
       indications_and_usage: z.array(z.string()).optional(),
+      drug_interactions: z.array(z.string()).optional(),
       openfda: z.object({ brand_name: z.array(z.string()).optional(), generic_name: z.array(z.string()).optional(), manufacturer_name: z.array(z.string()).optional() }).optional(),
     }),
   ),
@@ -122,6 +123,8 @@ export async function openfdaLabel(productRxcuis: string[]): Promise<RecordDraft
     if (warn) extra.warnings = clip(warn) as string;
     if (x.contraindications?.[0]) extra.contraindications = clip(x.contraindications[0]) as string;
     if (x.indications_and_usage?.[0]) extra.indications = clip(x.indications_and_usage[0]) as string;
+    // label "Drug interactions" section, quoted from the source (field verified live 2026-10-09)
+    if (x.drug_interactions?.[0]) extra.interactions = clip(x.drug_interactions[0]) as string;
     if (x.openfda?.manufacturer_name?.[0]) extra.manufacturer = x.openfda.manufacturer_name[0];
     return {
       provider: 'openFDA label',

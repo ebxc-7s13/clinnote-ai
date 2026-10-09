@@ -6,7 +6,7 @@
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
-import { DEMO_VISIT_1, DEMO_VISIT_2 } from '../application/demo';
+import { DEMO_VISIT_1, DEMO_VISIT_1_MORE, DEMO_VISIT_2 } from '../application/demo';
 import type { Container } from '../application/container';
 
 jest.mock('expo-speech-recognition', () => ({ ExpoSpeechRecognitionModule: { addListener: () => ({ remove() {} }), isRecognitionAvailable: () => false, supportsOnDeviceRecognition: () => false, supportsRecording: () => false } }));
@@ -165,12 +165,20 @@ test('UI flow: consent → record (synthetic script) → stop → confirm roles 
   await press('Confirm and start recording');
   await screen.findByText('Run synthetic demo consultation (no microphone)');
   await press('Run synthetic demo consultation (no microphone)');
-  expect(await screen.findByText('● RECORDING')).toBeTruthy();
+  expect(await screen.findByText('● RECORDING', {}, { timeout: 5000 })).toBeTruthy();
   await act(async () => {
     jest.advanceTimersByTime(DEMO_VISIT_1.length * 1400 + 1000);
   });
   expect(await screen.findByText(/lost about 3 kg/)).toBeTruthy();
-  await press('Stop');
+  // RECORDING offers exactly Pause and Finish segment; finalize is not available while recording
+  expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Finalize consultation' })).toBeNull();
+  await press('Finish segment');
+  expect(await screen.findByText('SEG-0001 saved', {}, { timeout: 5000 })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Continue conversation' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Finalize consultation' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull();
+  await press('Review new transcript');
   expect(await screen.findByText('Speaker roles', {}, { timeout: 5000 })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Continue to clinical fact extraction' })).toBeDisabled();
   await press('Confirm speaker roles');
@@ -189,4 +197,110 @@ test('UI flow: consent → record (synthetic script) → stop → confirm roles 
   const done = await c.store.getVisit(p.patientId, v.visitId);
   expect(done.noteState).toBe('FINALIZED');
   expect(done.facts.every((f) => f.status !== 'CONFIRMED')).toBe(true); // finalize ≠ confirm
+});
+
+test('UI recording: pause/resume, second segment, finalize, add more — earlier transcript kept, start time unchanged', async () => {
+  const c = await containerMock.getContainer();
+  await c.store.saveSettings({ ...(await c.store.getSettings()), onboardingAcknowledgedAt: '2026-10-09T00:00:00.000Z', cloudProcessingEnabled: true });
+  const p = await c.store.createPatient({ age: 47, sex: 'MALE', isDemo: true });
+  const v = await c.store.createVisit(p.patientId, 'AMBIENT');
+  c.visits.recordConsent(v, 'VERBAL_ATTESTED_BY_CLINICIAN');
+  await c.store.saveVisit(v);
+  await renderRouter(APP, { initialUrl: `/visit/${p.patientId}/${v.visitId}/record` });
+  await screen.findByText('Run synthetic demo consultation (no microphone)');
+  await press('Run synthetic demo consultation (no microphone)');
+  expect(await screen.findByText('● RECORDING', {}, { timeout: 5000 })).toBeTruthy();
+  await act(async () => {
+    jest.advanceTimersByTime(2 * 1400);
+  });
+  await press('Pause');
+  expect(await screen.findByText('❚❚ PAUSED')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Finish segment' })).toBeTruthy();
+  await press('Resume');
+  expect(await screen.findByText('● RECORDING', {}, { timeout: 5000 })).toBeTruthy();
+  await act(async () => {
+    jest.advanceTimersByTime(DEMO_VISIT_1.length * 1400 + 1000);
+  });
+  await press('Finish segment');
+  await screen.findByText('SEG-0001 saved', {}, { timeout: 5000 });
+  const afterOne = await c.store.getVisit(p.patientId, v.visitId);
+  expect(afterOne.segments.map((s) => s.text)).toEqual(DEMO_VISIT_1.map((l) => l.text)); // no duplicate, none missing
+  await press('Finalize consultation');
+  expect(await screen.findByText('Consultation finalized')).toBeTruthy();
+  await press('Continue with synthetic demo script');
+  expect(await screen.findByText('● RECORDING', {}, { timeout: 5000 })).toBeTruthy();
+  await act(async () => {
+    jest.advanceTimersByTime(DEMO_VISIT_1_MORE.length * 1400 + 1000);
+  });
+  await press('Finish segment');
+  await screen.findByText('SEG-0002 saved', {}, { timeout: 5000 });
+  const done = await c.store.getVisit(p.patientId, v.visitId);
+  expect(done.recordingSegments.map((s) => s.displayCode)).toEqual(['SEG-0001', 'SEG-0002']);
+  expect(done.segments.slice(0, DEMO_VISIT_1.length).map((s) => s.text)).toEqual(DEMO_VISIT_1.map((l) => l.text));
+  expect(done.segments.length).toBe(DEMO_VISIT_1.length + DEMO_VISIT_1_MORE.length);
+  expect(done.startedAt).toBe(v.startedAt);
+  expect(done.consultationState).toBe('OPEN'); // reopened by adding conversation, finalize again explicitly
+  await press('Finalize consultation');
+  expect(await screen.findByRole('button', { name: 'Add more conversation' })).toBeTruthy();
+});
+
+test('Report screen: structured sections from the reconciled visit; allergies honest; JSON export available', async () => {
+  const { patientId, v1 } = await seedTwoVisits();
+  await renderRouter(APP, { initialUrl: `/visit/${patientId}/${v1}/report` });
+  expect(await screen.findByText('CLINNOTE CLINICAL ENCOUNTER REPORT')).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Patient details/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Medications/ })).toBeTruthy();
+  await press(/^Allergies/);
+  expect(await screen.findByText('Allergies not discussed')).toBeTruthy();
+  await press(/^Medications/);
+  expect(await screen.findByText('Current')).toBeTruthy();
+  expect(screen.getAllByText(/metformin/i).length).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Export JSON' })).toBeTruthy();
+  await press('Save report version');
+  expect(await screen.findByText(/Report version 1 saved\. Nothing was confirmed by saving\./, {}, { timeout: 5000 })).toBeTruthy();
+  const c = await containerMock.getContainer();
+  expect((await c.store.getVisit(patientId, v1)).reportVersions.length).toBe(1);
+});
+
+test('regression (emulator E2E): extraction done on another screen survives adding a second segment', async () => {
+  const c = await containerMock.getContainer();
+  await c.store.saveSettings({ ...(await c.store.getSettings()), onboardingAcknowledgedAt: '2026-10-09T00:00:00.000Z', cloudProcessingEnabled: true });
+  const p = await c.store.createPatient({ age: 47, sex: 'MALE', isDemo: true });
+  const v = await c.store.createVisit(p.patientId, 'AMBIENT');
+  c.visits.recordConsent(v, 'VERBAL_ATTESTED_BY_CLINICIAN');
+  await c.store.saveVisit(v);
+  await renderRouter(APP, { initialUrl: `/visit/${p.patientId}/${v.visitId}/record` });
+  await screen.findByText('Run synthetic demo consultation (no microphone)');
+  await press('Run synthetic demo consultation (no microphone)');
+  await screen.findByText('● RECORDING', {}, { timeout: 5000 });
+  await act(async () => {
+    jest.advanceTimersByTime(DEMO_VISIT_1.length * 1400 + 1000);
+  });
+  await press('Finish segment');
+  await screen.findByText('SEG-0001 saved', {}, { timeout: 5000 });
+  await press('Review new transcript');
+  await screen.findByText('Speaker roles', {}, { timeout: 5000 });
+  await press('Confirm speaker roles');
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Continue to clinical fact extraction' })).toBeEnabled());
+  await press('Continue to clinical fact extraction');
+  await screen.findByText('Symptoms', {}, { timeout: 5000 });
+  const extracted = await c.store.getVisit(p.patientId, v.visitId);
+  const factIds = extracted.facts.map((f) => f.factId);
+  expect(factIds.length).toBeGreaterThan(0);
+  await act(async () => router.back());
+  await act(async () => router.back());
+  await screen.findByText('Continue with synthetic demo script');
+  await press('Continue with synthetic demo script');
+  await screen.findByText('● RECORDING', {}, { timeout: 5000 });
+  await act(async () => {
+    jest.advanceTimersByTime(DEMO_VISIT_1_MORE.length * 1400 + 1000);
+  });
+  await press('Finish segment');
+  await screen.findByText('SEG-0002 saved', {}, { timeout: 5000 });
+  const after = await c.store.getVisit(p.patientId, v.visitId);
+  expect(after.facts.map((f) => f.factId)).toEqual(factIds); // nothing lost or overwritten
+  expect(after.clinicalExtractionState).toBe('COMPLETED');
+  expect(after.segments.filter((s) => s.recordingSegmentId === after.recordingSegments[0].recordingSegmentId).every((s) => s.speakerRoleConfirmed)).toBe(true);
+  expect(after.reconciledTranscriptVersion).toBeLessThan(after.transcriptVersion); // reconcile needed, not silently redone
 });

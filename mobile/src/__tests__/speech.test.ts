@@ -90,3 +90,29 @@ test('stop commits a dangling partial exactly once', () => {
   jest.advanceTimersByTime(2000);
   expect(finals).toEqual(['worse at night']);
 });
+
+test('pause: the final that follows stop is stored once; a partial is kept only if no final arrives', () => {
+  const finals: { t: string; kept?: boolean }[] = [];
+  const c = new LiveSpeechController(
+    { onFinal: (t, _c, m) => finals.push({ t, kept: m?.keptPartial }), onPartial: () => undefined, onStatus: () => undefined, onAudioFile: () => undefined },
+    { lang: 'en-US', filePrefix: 't', captureAudio: false },
+  );
+  c.start();
+  emit('result', { isFinal: false, results: [{ transcript: 'I have a cough', confidence: 0 }] });
+  c.pause();
+  emit('result', { isFinal: true, results: [{ transcript: 'I have a cough for three weeks', confidence: 0.9 }] });
+  jest.advanceTimersByTime(2000);
+  expect(finals).toEqual([{ t: 'I have a cough for three weeks', kept: false }]);
+  c.resume();
+  emit('result', { isFinal: false, results: [{ transcript: 'worse at night', confidence: 0 }] });
+  c.pause();
+  jest.advanceTimersByTime(2000); // no final delivered by the recognizer
+  expect(finals[1]).toEqual({ t: 'worse at night', kept: true });
+  expect(finals).toHaveLength(2);
+});
+
+test('medical vocabulary biasing and language are passed to the recognizer', () => {
+  const c = new LiveSpeechController({ onFinal: () => undefined, onPartial: () => undefined, onStatus: () => undefined, onAudioFile: () => undefined }, { lang: 'hi-IN', filePrefix: 't', captureAudio: false, biasing: ['metformin'] });
+  c.start();
+  expect(mockModule.start).toHaveBeenLastCalledWith(expect.objectContaining({ lang: 'hi-IN', contextualStrings: ['metformin'], addsPunctuation: true, continuous: true }));
+});

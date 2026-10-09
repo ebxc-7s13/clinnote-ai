@@ -32,3 +32,16 @@ export const DEMO_VISIT_2: DemoLine[] = [
   { role: 'DOCTOR', text: 'Allergies were not discussed today.' },
   { role: 'DOCTOR', text: 'Follow up in one month.' },
 ];
+
+/** Second recording segment of the same visit ("add more conversation"): new details plus one explicit correction. */
+export const DEMO_VISIT_1_MORE: DemoLine[] = [
+  { role: 'DOCTOR', text: 'A few more questions. What do you do for work?' },
+  { role: 'PATIENT', text: 'I work as a teacher.' },
+  { role: 'DOCTOR', text: 'And how old are you?' },
+  { role: 'PATIENT', text: "I'm 47." },
+  { role: 'PATIENT', text: 'Sorry, actually the cough started about four weeks ago, not three.' },
+  { role: 'PATIENT', text: 'I stopped taking atorvastatin last year.' },
+  { role: 'DOCTOR', text: 'Any allergies to medicines?' },
+  { role: 'PATIENT', text: 'No known allergies.' },
+  { role: 'DOCTOR', text: 'Chest is clear on examination.' },
+];

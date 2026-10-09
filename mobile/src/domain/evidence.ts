@@ -107,7 +107,10 @@ export function buildAutomaticQueries(v: Visit, patient: Patient): { planned: Pl
     };
   };
   const clinical: { term: string; facts: ClinicalFact[] }[] = [];
-  for (const [k, facts] of byConcept) {
+  // most reliable concepts first: clinician-confirmed, then stated more often, then earliest (presenting complaint)
+  const score = (fs: ClinicalFact[]) => (fs.some((f) => f.status === 'CONFIRMED') ? 1000 : 0) + fs.length * 10 - Math.min(9, (Math.min(...fs.map((f) => f.sourceStartTime ?? 0)) / 600) | 0);
+  const ordered = Array.from(byConcept.entries()).sort((a, b) => score(b[1]) - score(a[1]));
+  for (const [k, facts] of ordered) {
     const term = k.split('|')[1];
     if (k.startsWith('MED')) {
       const q = mk(term, facts, 'MEDICATION_STANDARD');
@@ -206,4 +209,17 @@ export function refreshEvidenceStaleness(v: Visit): void {
     const allGone = facts.length > 0 && facts.every((f) => f.status === 'REJECTED' || !!f.resolvedAwayByConflictId);
     e.citable = !allGone && e.sourceType !== 'CLINICAL_TRIAL' && e.sourceType !== 'PUBLIC_HEALTH';
   }
+}
+
+/**
+ * Concept signature of the facts that would drive an automatic search. When it differs from the one stored at the
+ * last search, the clinical context changed materially (new or removed concepts) and evidence should be refreshed.
+ */
+export function evidenceConceptSignature(v: Visit, patient: Patient): string {
+  return uniq(buildAutomaticQueries(v, patient).planned.map((p) => `${p.query.route}:${p.term.toLowerCase()}`)).sort().join('|');
+}
+
+export function evidenceOutdated(v: Visit, patient: Patient): boolean {
+  if (v.evidenceState === 'NOT_STARTED' || v.evidenceConceptSignature === undefined) return false;
+  return evidenceConceptSignature(v, patient) !== v.evidenceConceptSignature;
 }
