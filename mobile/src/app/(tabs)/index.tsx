@@ -2,17 +2,30 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { renderFact } from '../../domain/note';
+import { buildReminders, type ReminderKind } from '../../domain/reminders';
 import { formatDate, formatDateTime } from '../../domain/util';
 import { pendingFollowUps, unreviewedCount } from '../../domain/views';
-import { BottomBar, Banner, Button, Card, Chip, DemoBadge, Empty, Loading, Row, Section, T } from '../../presentation/components';
+import { BottomBar, Banner, Button, Card, Chip, DemoBadge, Empty, Icon, Loading, Row, ScreenSurface, Section, Stat, T, type IconName } from '../../presentation/components';
 import { showError, useApp, useWorkspace } from '../../presentation/AppContext';
 import { visitStatusLine } from '../../presentation/labels';
 import { space, useTheme } from '../../presentation/theme';
 
+const REMINDER_ICON: Record<ReminderKind, [IconName, 'danger' | 'warning' | 'info' | 'neutral']> = {
+  RECORDING_INTERRUPTED: ['record-rec', 'danger'],
+  FOLLOW_UP_OVERDUE: ['calendar-alert', 'danger'],
+  RECONCILE: ['source-merge', 'warning'],
+  CONFLICTS: ['alert-outline', 'danger'],
+  FOLLOW_UP_SOON: ['calendar-clock', 'info'],
+  CONSULTATION_OPEN: ['microphone-outline', 'info'],
+  UNREVIEWED: ['progress-question', 'warning'],
+  NOTE_DRAFT: ['note-edit-outline', 'neutral'],
+  FOLLOW_UP_UNDATED: ['calendar-blank-outline', 'neutral'],
+};
+
 export default function Home() {
   const { c } = useTheme();
+  const [allReminders, setAllReminders] = useState(false);
   const { app, settings } = useApp();
   const ws = useWorkspace();
   const [busy, setBusy] = useState(false);
@@ -22,7 +35,9 @@ export default function Home() {
   const patients = ws.patients ?? [];
   const all = Object.entries(ws.visitsByPatient ?? {}).flatMap(([pid, vs]) => vs.map((v) => ({ v, ref: patients.find((p) => p.patientId === pid)?.patientReference ?? '' })));
   const recentVisits = all.sort((a, b) => b.v.startedAt.localeCompare(a.v.startedAt)).slice(0, 5);
-  const interrupted = all.filter(({ v }) => v.recordingState === 'RECORDING' || v.recordingState === 'PAUSED');
+  const today = new Date().toISOString().slice(0, 10);
+  const reminders = buildReminders(patients, ws.visitsByPatient ?? {}, today);
+  const visitsToday = all.filter(({ v }) => v.startedAt.slice(0, 10) === today).length;
   const followUps = Object.values(ws.visitsByPatient ?? {}).flatMap((vs) => pendingFollowUps(vs));
 
   const createDemo = async () => {
@@ -38,19 +53,33 @@ export default function Home() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right']}>
+    <ScreenSurface edges={['left', 'right']}>
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: 120 }}>
         {ws.error ? <Banner tone="danger" title="Local data could not be read" message={ws.error} action={<Button kind="secondary" compact label="Retry" onPress={() => void ws.reload()} />} /> : null}
         {!settings.cloudProcessingEnabled ? <Banner tone="info" title="Manual mode" message="Cloud processing is off: nothing leaves this device. Recording, AI extraction and evidence search are unavailable. Change in Settings." /> : null}
-        {interrupted.map(({ v, ref }) => (
-          <Banner
-            key={v.visitId}
-            tone="warning"
-            title={`Recording interrupted · ${ref} · ${v.visitCode}`}
-            message={`${v.segments.length} transcript segment(s) are saved. Resume recording or stop and review.`}
-            action={<Button compact kind="secondary" label="Open recording" onPress={() => router.push(`/visit/${v.patientId}/${v.visitId}/record`)} />}
-          />
-        ))}
+        <Row>
+          <Stat value={patients.length} label="patients" icon="account-multiple-outline" tone="primary" onPress={() => router.push('/patients')} />
+          <Stat value={visitsToday} label="visits today" icon="calendar-today" tone="info" onPress={() => router.push('/visits')} />
+          <Stat value={reminders.length} label="reminders" icon="bell-outline" tone={reminders.some((r) => r.priority <= 3) ? 'danger' : reminders.length ? 'warning' : 'neutral'} />
+        </Row>
+        {reminders.length ? (
+          <Section title="Reminders" subtitle="From your records on this device. No notifications are sent." right={reminders.length > 4 ? <Button kind="ghost" compact label={allReminders ? 'Fewer' : `All (${reminders.length})`} onPress={() => setAllReminders(!allReminders)} /> : undefined}>
+            {(allReminders ? reminders : reminders.slice(0, 4)).map((r) => {
+              const [icon, tone] = REMINDER_ICON[r.kind];
+              const color = tone === 'danger' ? c.danger : tone === 'warning' ? c.warning : tone === 'info' ? c.info : c.textMuted;
+              return (
+                <Card key={r.id} onPress={() => router.push(r.href as never)} accessibilityLabel={`${r.title}, ${r.detail}${r.due ? `, due ${formatDate(r.due)}` : ''}`} style={{ padding: space.md, borderLeftWidth: 4, borderLeftColor: color }}>
+                  <Row>
+                    <Icon name={icon} color={color} size={22} />
+                    <T style={{ fontWeight: '700', flex: 1 }}>{r.title}</T>
+                    {r.due ? <Chip label={`${r.kind === 'FOLLOW_UP_OVERDUE' ? 'was due' : 'due'} ${formatDate(r.due)}`} tone={tone === 'danger' ? 'danger' : 'info'} /> : null}
+                  </Row>
+                  <T variant="small" muted>{r.detail}</T>
+                </Card>
+              );
+            })}
+          </Section>
+        ) : null}
         <Button kind="secondary" label="Search patients, visits and notes" icon="magnify" onPress={() => router.push('/search')} />
 
         <Section title="Recent patients" right={<Button kind="ghost" compact label="All" onPress={() => router.push('/patients')} />}>
@@ -110,6 +139,6 @@ export default function Home() {
       <BottomBar inTabs>
         <Button label="Start new visit" icon="plus-circle-outline" onPress={() => router.push('/visit/start')} accessibilityHint="Choose or create a patient, then start a recorded or manual visit" />
       </BottomBar>
-    </SafeAreaView>
+    </ScreenSurface>
   );
 }

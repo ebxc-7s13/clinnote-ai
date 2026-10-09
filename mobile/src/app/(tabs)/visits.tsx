@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { formatDateTime } from '../../domain/util';
 import { unreviewedCount } from '../../domain/views';
-import { BottomBar, Banner, Button, Card, Chip, Empty, Loading, Row, Segmented, T } from '../../presentation/components';
+import { GlassBackground, BottomBar, Banner, Button, Card, Chip, Empty, Loading, Row, Segmented, T } from '../../presentation/components';
 import { useWorkspace } from '../../presentation/AppContext';
 import { visitStatusLine } from '../../presentation/labels';
 import { space, useTheme } from '../../presentation/theme';
@@ -22,7 +22,8 @@ export default function Visits() {
     .filter((v) => (filter === 'REVIEW' ? unreviewedCount(v) > 0 || v.conflicts.some((x) => x.status === 'OPEN') : filter === 'DRAFT' ? v.noteState !== 'FINALIZED' : true))
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1, backgroundColor: c.bgGradient[0] }}>
+      <GlassBackground />
       <View style={{ padding: space.lg, paddingBottom: space.sm }}>
         <Segmented label="Filter visits" value={filter} onChange={setFilter} options={[{ value: 'ALL', label: 'All' }, { value: 'REVIEW', label: 'Needs review' }, { value: 'DRAFT', label: 'Not finalized' }]} />
         {ws.error ? <Banner tone="danger" message={ws.error} action={<Button compact kind="secondary" label="Retry" onPress={() => void ws.reload()} />} /> : null}

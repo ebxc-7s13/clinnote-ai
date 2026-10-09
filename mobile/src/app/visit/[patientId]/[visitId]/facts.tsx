@@ -6,7 +6,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Switch, View } from 'react-native';
-import { addManualFact, confirmFact, isCurrent, isFlaggedIneligible, rejectFact, resolveConflict } from '../../../../domain/facts';
+import { needsReconciliation } from '../../../../domain/consultation';
+import { LANGUAGES } from '../../../../domain/languages';
+import { addManualFact, audit, confirmFact, isCurrent, isFlaggedIneligible, rejectFact, resolveConflict } from '../../../../domain/facts';
 import { categoryLabel } from '../../../../domain/note';
 import type { ClinicalFact, FactCategory, InformationState } from '../../../../domain/types';
 import { formatDuration } from '../../../../domain/util';
@@ -17,6 +19,7 @@ import { provenanceText, STATE_LABEL } from '../../../../presentation/labels';
 import { useTheme } from '../../../../presentation/theme';
 
 const GROUPS: { title: string; cats: FactCategory[] }[] = [
+  { title: 'Patient details (stated)', cats: ['DEMOGRAPHIC'] },
   { title: 'Symptoms', cats: ['SYMPTOM'] },
   { title: 'History', cats: ['HISTORY_MEDICAL', 'HISTORY_SURGICAL', 'HISTORY_FAMILY', 'HISTORY_SOCIAL'] },
   { title: 'Medications', cats: ['MEDICATION'] },
@@ -89,12 +92,12 @@ function ManualEntry({ onAdd }: { onAdd: (input: { category: FactCategory; value
 export default function Facts() {
   const { app, settings } = useApp();
   const { patientId, visitId } = useLocalSearchParams<{ patientId: string; visitId: string }>();
-  const { visit, all, error, mutate } = useVisit(patientId, visitId);
+  const { patient, visit, all, error, mutate, reload } = useVisit(patientId, visitId);
   const [history, setHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   if (error) return <Screen><Banner tone="danger" message={error} /></Screen>;
-  if (!visit || !all) return <Loading />;
+  if (!visit || !all || !patient) return <Loading />;
 
   const act = (fn: Parameters<typeof mutate>[0]) => mutate(fn).catch((e) => showError(e));
   const facts = visit.facts.filter((f) => history || isCurrent(f));
@@ -108,13 +111,36 @@ export default function Facts() {
     setBusy(true);
     try {
       await mutate(async (v, ctx) => {
-        const r = await app.visits.runExtraction(v, settings, ctx.all.filter((x) => x.visitId !== v.visitId));
+        const r = await app.visits.runExtraction(v, settings, ctx.all.filter((x) => x.visitId !== v.visitId), ctx.patient);
         setMsg(r.message ?? null);
       });
     } catch (e) {
       showError(e);
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Explicit clinician choice: copy the stated value into the profile (audited). The profile is never changed otherwise. */
+  const applyStatedValue = async (conflictId: string, f: ClinicalFact) => {
+    const c = visit.conflicts.find((x) => x.conflictId === conflictId);
+    if (!c?.profileField) return;
+    try {
+      const p = await app.store.getPatient(patientId);
+      const said = f.attributes.demographicValue ?? f.value;
+      if (c.profileField === 'age') p.age = f.attributes.numericValue;
+      else if (c.profileField === 'preferredLanguage') p.preferredLanguage = LANGUAGES.find((l) => l.displayName.toLowerCase() === said.toLowerCase())?.languageCode ?? said;
+      else if (c.profileField === 'name') p.name = said;
+      else if (c.profileField === 'occupation') p.occupation = said;
+      else return; // sex is never taken from speech
+      await app.store.savePatient(p);
+      await mutate((v, ctx) => {
+        resolveConflict(v, conflictId, f.factId, ctx.all);
+        audit(v, 'PATIENT', patientId, 'PROFILE_UPDATED_FROM_CONSULTATION', 'CLINICIAN', `${c.profileField}: ${c.profileValue} → ${said}`);
+      });
+      await reload();
+    } catch (e) {
+      showError(e);
     }
   };
 
@@ -132,6 +158,7 @@ export default function Facts() {
 
   return (
     <Screen>
+      {needsReconciliation(visit) ? <Banner tone="warning" title="Transcript changed since extraction" message="New conversation or corrections were added. Reconcile the complete visit to update these facts; confirmed facts are kept." action={<Button compact label="Reconcile complete visit" icon="source-merge" onPress={() => router.push(`/visit/${patientId}/${visitId}/transcript?reconcile=1`)} />} /> : null}
       {visit.clinicalExtractionState === 'PARTIAL' ? <Banner tone="warning" message="AI extraction was unavailable; rule-based results are shown. You can retry later or add facts manually." /> : null}
       {msg ? <Banner tone="info" message={msg} /> : null}
       {extracting ? <Banner tone="info" message="Extracting facts…" /> : null}
@@ -155,6 +182,19 @@ export default function Facts() {
         <Section title="Conflict — review" subtitle="Both statements are kept. Choose which is current, or mark as not a conflict.">
           {openConflicts.map((c) => {
             const fs = c.factIds.map(fById).filter((f): f is ClinicalFact => !!f);
+            if (c.conflictType === 'PROFILE_MISMATCH') {
+              const f = fs[0];
+              return (
+                <Card key={c.conflictId}>
+                  <Chip label="differs from patient profile" tone="danger" icon="account-alert-outline" />
+                  <T style={{ fontWeight: '600' }}>Profile ({c.profileField === 'preferredLanguage' ? 'language' : c.profileField}): {c.profileValue}</T>
+                  {f ? <T style={{ fontWeight: '600' }}>Stated in consultation: “{f.value}” — {provenanceText(f)}</T> : null}
+                  <T variant="small" muted>The profile was not changed. Choose which value to keep; both stay in the record.</T>
+                  {f ? <Button compact kind="secondary" label="Use the stated value in the profile" onPress={() => void applyStatedValue(c.conflictId, f)} /> : null}
+                  <Button compact kind="ghost" label="Keep the profile value" onPress={() => void act((v, ctx) => resolveConflict(v, c.conflictId, null, ctx.all))} />
+                </Card>
+              );
+            }
             return (
               <Card key={c.conflictId}>
                 <Chip label={c.conflictType.replace(/_/g, ' ').toLowerCase()} tone="danger" icon="alert-outline" />

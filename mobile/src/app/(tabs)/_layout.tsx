@@ -1,21 +1,24 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../presentation/theme';
 
 export default function TabsLayout() {
   const { c } = useTheme();
+  // the tab bar must sit above the Android navigation bar (3-button navigation has a tall inset)
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: c.surface },
+        headerStyle: { backgroundColor: c.header },
         headerTintColor: c.text,
-        headerTitleStyle: { fontWeight: '700' },
+        headerTitleStyle: { fontWeight: '800' },
         headerShadowVisible: false,
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: c.textMuted,
-        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, height: 64, paddingBottom: 8, paddingTop: 6 },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-        sceneStyle: { backgroundColor: c.bg },
+        tabBarStyle: { backgroundColor: c.bar, borderTopColor: c.glassBorder, borderTopWidth: 1, height: 64 + insets.bottom, paddingBottom: 8 + insets.bottom, paddingTop: 6 },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
+        sceneStyle: { backgroundColor: c.bgGradient[0] },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home', headerTitle: 'ClinNote', tabBarIcon: ({ color }) => <MaterialCommunityIcons name="home-outline" size={24} color={color} /> }} />

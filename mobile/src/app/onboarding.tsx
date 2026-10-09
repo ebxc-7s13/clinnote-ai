@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { nowIso } from '../domain/util';
-import { Banner, Button, Icon, Row, T, type IconName } from '../presentation/components';
+import { GlassBackground, Banner, Button, Icon, Row, T, type IconName } from '../presentation/components';
 import { useApp } from '../presentation/AppContext';
 import { ONBOARDING_VERSION } from '../presentation/labels';
 import { radius, space, useTheme } from '../presentation/theme';
@@ -31,7 +31,8 @@ export default function Onboarding() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bgGradient[0] }}>
+      <GlassBackground />
       <View style={{ flex: 1, padding: space.xl, gap: space.lg, justifyContent: 'center' }}>
         <T variant="small" muted>
           ClinNote · {Math.min(page + 1, PAGES.length + 1)} of {PAGES.length + 1}

@@ -1,11 +1,14 @@
 /** Screen 18 — Settings (FR-28). Cloud processing off = manual mode: no data leaves the device. */
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { Alert, Switch } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, Switch, Text, View } from 'react-native';
+import { resolveLanguages, type DeviceSpeechLocales } from '../../domain/languages';
+import { deviceSpeechLocales } from '../../infrastructure/speech/liveSpeech';
 import { destroyDataKey, R2_SELECTABLE, APP_VARIANT } from '../../application/container';
 import { purgeOldAudio } from '../../infrastructure/storage/expoFileBackend';
 import { backendConfig, FREE_ONLY_MODE } from '../../providers/backend';
-import { Banner, Button, Card, Chip, Row, Screen, Section, Segmented, T } from '../../presentation/components';
+import { Banner, Button, Card, Chip, haptic, Row, Screen, Section, Segmented, T } from '../../presentation/components';
 import { showError, useApp } from '../../presentation/AppContext';
 import { useTheme } from '../../presentation/theme';
 
@@ -13,10 +16,10 @@ function Toggle({ label, value, onChange, hint, disabled }: { label: string; val
   const { c } = useTheme();
   return (
     <Row style={{ justifyContent: 'space-between', minHeight: 48 }}>
-      <Card style={{ flex: 1, padding: 0, borderWidth: 0, backgroundColor: 'transparent' }}>
+      <View style={{ flex: 1, gap: 2 }}>
         <T style={{ fontWeight: '600' }}>{label}</T>
         {hint ? <T variant="small" muted>{hint}</T> : null}
-      </Card>
+      </View>
       <Switch accessibilityLabel={`${label}: ${value ? 'on' : 'off'}`} value={value} onValueChange={onChange} disabled={disabled} trackColor={{ true: c.primary, false: c.border }} />
     </Row>
   );
@@ -24,7 +27,14 @@ function Toggle({ label, value, onChange, hint, disabled }: { label: string; val
 
 export default function Settings() {
   const { app, settings, updateSettings } = useApp();
+  const { c } = useTheme();
   const cfg = backendConfig();
+  const [device, setDevice] = useState<DeviceSpeechLocales | null>(null);
+  useEffect(() => {
+    void deviceSpeechLocales().then(setDevice).catch(() => setDevice(null));
+  }, []);
+  const langs = resolveLanguages(device);
+  const chosen = langs.find((l) => l.entry.languageCode === settings.language) ?? langs[1];
 
   const deleteAll = () =>
     Alert.alert('Delete all local data?', 'Every patient, visit, note and cached evidence record on this device is deleted and the encryption key is destroyed. This cannot be undone.', [
@@ -60,6 +70,34 @@ export default function Settings() {
             <Chip label={FREE_ONLY_MODE ? 'Free-only mode: no paid services or fallbacks' : 'Paid mode'} tone="info" icon="currency-usd-off" />
           </Row>
           {!cfg.url ? <T variant="small" muted>Without a backend, live on-device transcription, rule-based extraction and public evidence sources still work when cloud processing is on.</T> : <T variant="small" muted>Cloud AI (free tier) is used for synthetic demo patients only; its terms allow submitted content to improve the provider’s products.</T>}
+        </Card>
+      </Section>
+
+      <Section title="Consultation language">
+        <Card>
+          <T variant="small" muted>{"Default language for new recording segments. Only languages this device's speech service reports can be selected; each segment stores its language. Automatic fact extraction is English-only — other languages keep the original transcript for manual review. No translation service is used."}</T>
+          <Row wrap>
+            {langs.map((l) => {
+              const on = l.entry.languageCode === settings.language;
+              return (
+                <Pressable
+                  key={l.entry.languageCode}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on, disabled: !l.enabled }}
+                  accessibilityLabel={`${l.entry.displayName}${l.enabled ? '' : ', unavailable on this device'}`}
+                  onPress={() => {
+                    haptic('select');
+                    if (l.enabled) void updateSettings({ language: l.entry.languageCode });
+                    else Alert.alert(l.entry.displayName, l.reason);
+                  }}
+                  style={{ minHeight: 40, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', backgroundColor: on ? c.primary : c.glassStrong, borderWidth: 1, borderColor: on ? c.primary : c.glassBorder, opacity: l.enabled ? 1 : 0.5 }}
+                >
+                  <Text style={{ color: on ? c.primaryText : c.text, fontWeight: '700' }}>{l.entry.displayName}</Text>
+                </Pressable>
+              );
+            })}
+          </Row>
+          <T variant="small" muted>{chosen.entry.displayName}: {chosen.reason}</T>
         </Card>
       </Section>
 

@@ -31,7 +31,25 @@ export function EvidenceCard({ e }: { e: EvidenceSource }) {
           <T variant="small" selectable>{e.excerpt}</T>
         </View>
       ) : null}
-      {e.sourceType === 'REGULATORY' ? <T variant="small" muted>Label information — not a dosing recommendation.</T> : null}
+      {e.sourceType === 'REGULATORY'
+        ? (
+            [
+              ['boxedWarning', 'Boxed warning'],
+              ['indications', 'Indications stated in the label'],
+              ['contraindications', 'Contraindications'],
+              ['warnings', 'Warnings and precautions'],
+              ['interactions', 'Drug interactions section'],
+            ] as const
+          )
+            .filter(([k]) => e.extra?.[k])
+            .map(([k, label]) => (
+              <View key={k} style={{ gap: 2 }}>
+                <T variant="small" style={{ fontWeight: '700', color: k === 'boxedWarning' ? c.danger : c.textMuted }}>{label} (quoted from {e.provider})</T>
+                <T variant="small" selectable>{e.extra?.[k]}</T>
+              </View>
+            ))
+        : null}
+      {e.sourceType === 'REGULATORY' ? <T variant="small" muted>Label information — not a dosing recommendation, and not an assessment of suitability for this patient.</T> : null}
       <Button kind="ghost" compact icon="open-in-new" label="Open source" accessibilityHint={e.url} onPress={() => void Linking.openURL(e.url).catch(() => undefined)} style={{ alignSelf: 'flex-start' }} />
       <T variant="small" muted selectable>{e.url}</T>
     </Card>

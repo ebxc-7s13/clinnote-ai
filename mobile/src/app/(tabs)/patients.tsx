@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import type { PatientIndexEntry } from '../../domain/types';
 import { formatDate } from '../../domain/util';
-import { BottomBar, Banner, Button, Card, DemoBadge, Empty, Field, Loading, Row, T } from '../../presentation/components';
+import { GlassBackground, BottomBar, Banner, Button, Card, DemoBadge, Empty, Field, Loading, Row, T } from '../../presentation/components';
 import { useApp } from '../../presentation/AppContext';
 import { space, useTheme } from '../../presentation/theme';
 
@@ -36,7 +36,8 @@ export default function Patients() {
 
   if (!list && !error) return <Loading />;
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1, backgroundColor: c.bgGradient[0] }}>
+      <GlassBackground />
       <View style={{ padding: space.lg, paddingBottom: space.sm, gap: space.sm }}>
         <Field label="Search patients" placeholder="Reference (P-000001) or name" value={q} onChangeText={setQ} autoCorrect={false} autoCapitalize="none" />
         {error ? <Banner tone="danger" message={error} action={<Button compact kind="secondary" label="Retry" onPress={() => void load()} />} /> : null}

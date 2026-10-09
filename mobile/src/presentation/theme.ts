@@ -1,4 +1,8 @@
-/** Design tokens (UI-UX.md §1–2): calm, clinical, high contrast; status never by colour alone. */
+/**
+ * Design tokens (UI-UX.md §1–2, §2a liquid glass): calm, clinical, high contrast; status never by colour alone.
+ * Glass = translucent surfaces over a soft gradient with drifting colour fields; text always sits on a surface
+ * opaque enough for WCAG AA contrast.
+ */
 import { useColorScheme } from 'react-native';
 import { createContext, useContext } from 'react';
 
@@ -22,6 +26,22 @@ export interface Palette {
   infoSoft: string;
   recording: string;
   focus: string;
+  // ---- liquid glass
+  bgGradient: [string, string, string];
+  orbs: [string, string, string];
+  glass: string;
+  glassStrong: string;
+  glassBorder: string;
+  glassEdge: string;
+  glassHighlight: [string, string];
+  shadow: string;
+  primaryGradient: [string, string];
+  recordingGradient: [string, string];
+  dangerGradient: [string, string];
+  successGradient: [string, string];
+  /** opaque surface for fixed action bars: scrolled content must never show through */
+  bar: string;
+  header: string;
 }
 
 export const light: Palette = {
@@ -44,6 +64,20 @@ export const light: Palette = {
   infoSoft: '#E8EDF8',
   recording: '#C62828',
   focus: '#1B6FB3',
+  bgGradient: ['#E6EFF9', '#F1EDFA', '#E5F4F0'],
+  orbs: ['rgba(77,163,225,0.34)', 'rgba(150,118,232,0.24)', 'rgba(56,190,160,0.22)'],
+  glass: 'rgba(255,255,255,0.66)',
+  glassStrong: 'rgba(255,255,255,0.86)',
+  glassBorder: 'rgba(255,255,255,0.95)',
+  glassEdge: 'rgba(20,40,60,0.10)',
+  glassHighlight: ['rgba(255,255,255,0.85)', 'rgba(255,255,255,0)'],
+  shadow: '#1B3A5C',
+  primaryGradient: ['#1677B8', '#0B5C8A'],
+  recordingGradient: ['#E53935', '#B71C1C'],
+  dangerGradient: ['#D84339', '#A3221B'],
+  successGradient: ['#2E8B57', '#1E6B3A'],
+  bar: '#F6F9FD',
+  header: '#E9F0F9',
 };
 
 export const dark: Palette = {
@@ -66,10 +100,24 @@ export const dark: Palette = {
   infoSoft: '#1B2440',
   recording: '#FF6B6B',
   focus: '#7CC4F5',
+  bgGradient: ['#0A111C', '#111830', '#0B1A1C'],
+  orbs: ['rgba(77,163,225,0.24)', 'rgba(140,110,232,0.20)', 'rgba(56,190,160,0.14)'],
+  glass: 'rgba(30,42,56,0.62)',
+  glassStrong: 'rgba(20,29,40,0.90)',
+  glassBorder: 'rgba(255,255,255,0.14)',
+  glassEdge: 'rgba(0,0,0,0.35)',
+  glassHighlight: ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0)'],
+  shadow: '#000000',
+  primaryGradient: ['#6CC0F0', '#3D97D3'],
+  recordingGradient: ['#FF6B6B', '#D63B3B'],
+  dangerGradient: ['#FF8A80', '#E0574C'],
+  successGradient: ['#7BD49A', '#3FA567'],
+  bar: '#101822',
+  header: '#0B121D',
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const radius = { sm: 6, md: 10, lg: 14 };
+export const radius = { sm: 8, md: 14, lg: 20, xl: 28 };
 export const type = {
   title: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.2 },
   h2: { fontSize: 18, fontWeight: '700' as const },

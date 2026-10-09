@@ -5,6 +5,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, TextInput, View } from 'react-native';
+import { needsReconciliation } from '../../../../domain/consultation';
 import { exportNote } from '../../../../domain/export';
 import { addNoteVersion, finalizeNote } from '../../../../domain/note';
 import type { NoteType } from '../../../../domain/types';
@@ -125,6 +126,7 @@ export default function NoteEditor() {
           </Row>
           {n ? <Banner tone="warning" message={`${n} fact(s) not yet reviewed — finalizing does not confirm them.`} action={<Button compact kind="secondary" label="Review facts" onPress={() => router.push(`/visit/${patientId}/${visitId}/facts`)} />} /> : null}
           {conflicts ? <Banner tone="danger" message={`${conflicts} open conflict(s) — shown as conflicts in the note.`} /> : null}
+          {needsReconciliation(visit) ? <Banner tone="warning" title="Conversation added since the facts were extracted" message={finalized ? 'This finalized note does not include it. Reconcile the visit, then amend the note (a new version).' : 'Reconcile the visit, then regenerate the draft to include it.'} action={<Button compact kind="secondary" label="Reconcile visit" icon="source-merge" onPress={() => router.push(`/visit/${patientId}/${visitId}/transcript?reconcile=1`)} />} /> : null}
           <TextInput
             accessibilityLabel="Note text"
             editable={!finalized}
@@ -134,7 +136,7 @@ export default function NoteEditor() {
               setText(t);
               setDirty(true);
             }}
-            style={{ minHeight: 360, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: space.md, color: c.text, backgroundColor: finalized ? c.surfaceAlt : c.surface, fontSize: 15, lineHeight: 22, textAlignVertical: 'top' }}
+            style={{ minHeight: 360, borderWidth: 1, borderColor: c.glassBorder, borderRadius: radius.md, padding: space.md, color: c.text, backgroundColor: finalized ? c.glass : c.glassStrong, fontSize: 15, lineHeight: 22, textAlignVertical: 'top' }}
           />
           {saved ? <T variant="small" muted>{dirty ? 'Unsaved changes…' : saved}</T> : null}
           {!finalized ? (

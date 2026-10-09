@@ -80,12 +80,14 @@ export const ONBOARDING_VERSION = 1;
 
 /** One-line pipeline status in words (UI-UX Screen 21). */
 export function visitStatusLine(v: Visit): string {
-  if (v.recordingState === 'RECORDING' || v.recordingState === 'PAUSED') return 'recording interrupted — resume or stop';
+  if (v.recordingState === 'RECORDING' || v.recordingState === 'PAUSED') return 'recording interrupted — resume or finish the segment';
   const parts = [
-    v.mode === 'AMBIENT' ? `transcript ${STAGE_LABEL[v.transcriptState]}` : 'manual visit',
+    v.mode === 'AMBIENT' ? `${v.recordingSegments.length || 1} segment(s) · consultation ${v.consultationState === 'FINALIZED' ? 'finalized' : 'open'}` : 'manual visit',
+    ...(v.reconciledTranscriptVersion !== undefined && v.reconciledTranscriptVersion !== v.transcriptVersion ? ['reconcile needed'] : []),
+    v.mode === 'AMBIENT' ? `transcript ${STAGE_LABEL[v.transcriptState]}` : null,
     `facts ${STAGE_LABEL[v.clinicalExtractionState]}`,
     `evidence ${STAGE_LABEL[v.evidenceState]}`,
     NOTE_STATE_LABEL[v.noteState],
-  ];
+  ].filter(Boolean);
   return parts.join(' · ');
 }

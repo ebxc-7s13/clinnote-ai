@@ -31,11 +31,11 @@ function ThemedStack() {
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: c.surface },
+          headerStyle: { backgroundColor: c.header },
           headerTintColor: c.text,
-          headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+          headerTitleStyle: { fontWeight: '800', fontSize: 17 },
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: c.bg },
+          contentStyle: { backgroundColor: c.bgGradient[0] },
           animation: 'slide_from_right',
         }}
       >
@@ -62,6 +62,7 @@ function ThemedStack() {
           <Stack.Screen name="visit/[patientId]/[visitId]/medication/[factId]" options={{ title: 'Medication information' }} />
           <Stack.Screen name="visit/[patientId]/[visitId]/note" options={{ title: 'Note' }} />
           <Stack.Screen name="visit/[patientId]/[visitId]/compare" options={{ title: 'What changed' }} />
+          <Stack.Screen name="visit/[patientId]/[visitId]/report" options={{ title: 'Clinical report' }} />
           <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
           <Stack.Screen name="about" options={{ title: 'About' }} />
         </Stack.Protected>

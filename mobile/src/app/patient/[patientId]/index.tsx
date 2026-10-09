@@ -15,11 +15,12 @@ import { addManualProblem, setProblemStatus } from '../../../domain/problems';
 import { symptomCourse } from '../../../domain/timeline';
 import { formatDate, formatDateTime } from '../../../domain/util';
 import { activeProblems, allergyStatus, currentMedications, pendingFollowUps, proposedForReview } from '../../../domain/views';
-import { BottomBar, Banner, Button, Card, Chip, DemoBadge, Divider, Field, Loading, Row, Section, T } from '../../../presentation/components';
+import { GlassBackground, BottomBar, Banner, Button, Card, Chip, DemoBadge, Divider, Field, Loading, Row, Section, T } from '../../../presentation/components';
 import { showError, useApp, usePatient } from '../../../presentation/AppContext';
 import { FactChips } from '../../../presentation/FactRow';
 import { askExport } from '../../../presentation/exportUi';
-import { NOTE_STATE_LABEL, visitStatusLine } from '../../../presentation/labels';
+import { NOTE_STATE_LABEL, provenanceText, visitStatusLine } from '../../../presentation/labels';
+import { languageName } from '../../../domain/languages';
 import { space, useTheme } from '../../../presentation/theme';
 
 export default function PatientOverview() {
@@ -30,7 +31,7 @@ export default function PatientOverview() {
   const [problem, setProblem] = useState('');
   const [showProposed, setShowProposed] = useState(false);
 
-  if (error) return <View style={{ flex: 1, padding: space.lg, backgroundColor: c.bg }}><Banner tone="danger" message={error} action={<Button compact kind="secondary" label="Retry" onPress={() => void reload()} />} /></View>;
+  if (error) return <View style={{ flex: 1, padding: space.lg, backgroundColor: c.bgGradient[0] }}><Banner tone="danger" message={error} action={<Button compact kind="secondary" label="Retry" onPress={() => void reload()} />} /></View>;
   if (!patient || !visits) return <Loading />;
 
   const sorted = [...visits].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
@@ -44,6 +45,11 @@ export default function PatientOverview() {
   const investigations = sorted.slice(-3).flatMap((v) => v.facts.filter((f) => f.category === 'INVESTIGATION' && isEligible(f)).map((f) => ({ f, v })));
   const course = symptomCourse(visits);
   const problems = activeProblems(patient);
+  const stated = Array.from(
+    new Map(
+      sorted.flatMap((v) => v.facts.filter((f) => f.category === 'DEMOGRAPHIC' && isEligible(f) && f.informationState === 'POSITIVE').map((f) => ({ f, v }))).map((x) => [x.f.attributes.demographicKind ?? x.f.factId, x]),
+    ).values(),
+  );
 
   const savePatient = async (fn: () => void) => {
     try {
@@ -73,7 +79,8 @@ export default function PatientOverview() {
     ]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bgGradient[0] }} edges={['left', 'right', 'bottom']}>
+      <GlassBackground />
       <Stack.Screen options={{ title: patient.patientReference }} />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: 120 }}>
         <Card>
@@ -83,8 +90,21 @@ export default function PatientOverview() {
           </Row>
           {patient.name ? <T>{patient.name}</T> : null}
           <T muted>{[patient.age !== undefined ? `${patient.age} years` : 'age not recorded', patient.sex ? patient.sex.toLowerCase() : 'sex not recorded', `${visits.length} visit(s)`].join(' · ')}</T>
+          {patient.occupation || patient.preferredLanguage ? <T muted>{[patient.occupation, patient.preferredLanguage ? `prefers ${languageName(patient.preferredLanguage)}` : null].filter(Boolean).join(' · ')}</T> : null}
           {patient.isDemo ? <DemoBadge /> : null}
         </Card>
+
+        {stated.length ? (
+          <Section title="Mentioned in consultations" subtitle="Patient details stated in conversation. Shown with their source; the profile changes only when you choose so in Clinical facts.">
+            <Card>
+              {stated.map(({ f, v }) => (
+                <T key={f.factId} variant="small">
+                  {(f.attributes.demographicKind ?? '').toLowerCase().replace('_', ' ')}: {f.attributes.demographicValue ?? f.value}{f.attributes.demographicQualifier === 'PREVIOUS' ? ' (previous)' : ''} · {provenanceText(f)}{f.status !== 'CONFIRMED' ? ', provisional' : ''} · {v.visitCode}
+                </T>
+              ))}
+            </Card>
+          </Section>
+        ) : null}
 
         {last ? (
           <Section title="Last visit">
@@ -94,6 +114,10 @@ export default function PatientOverview() {
                 <T variant="small" muted>{formatDateTime(last.startedAt)}</T>
               </Row>
               <T variant="small" muted>{visitStatusLine(last)}</T>
+              <Row wrap>
+                <Button compact kind="secondary" label="Clinical report" icon="file-document-multiple-outline" onPress={() => router.push(`/visit/${patient.patientId}/${last.visitId}/report`)} />
+                {last.consent?.state === 'CONFIRMED' ? <Button compact kind="secondary" label="Add conversation" icon="microphone-plus" onPress={() => router.push(`/visit/${patient.patientId}/${last.visitId}/record`)} /> : null}
+              </Row>
             </Card>
           </Section>
         ) : null}
