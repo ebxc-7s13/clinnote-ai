@@ -1,180 +1,340 @@
-# ClinNote AI — Build Report
+# ClinNote AI — Final Build Report
 
-Written from the actual repository state and from command output in the **Stage A resume session**, 2026-10-08 (UTC, about 12:30Z–14:10Z). It replaces the Phase 0 report. A previous report is not evidence; everything below was checked in this session.
+Written on 2026-10-09 (UTC) from the repository state and from command output produced in the M3/M4 session. A previous report is not evidence. Branch `feat/v1-app`; commits are listed under **Git**.
 
-## Summary
+Status words: **IMPLEMENTED** (code exists) · **TESTED** (automated tests ran and passed in this session) · **PARTIALLY TESTED** · **NOT TESTED** · **BLOCKED**.
 
-| Item | Value |
-|---|---|
-| Stage | STAGE A: specification reconciliation (Phase 0 close-out). **Complete at documentation level** |
-| Application code | NOT STARTED |
-| Model downloads | NONE |
-| Real patient data | NONE (synthetic examples only; one example reference corrected to `P-900001`) |
-| API credentials | NONE ADDED |
-| Findings F-01…F-14 | all RESOLVED in the specification; behavior tests PENDING (no implementation) |
-| HIGH residual findings | S2-02, S2-14, S4-01 (= E4-01), P4-01, S6-01: all RESOLVED (ADR-044, ADR-045) |
-| Gate 6 (clinical safety) | documentation verdict **PASS** (clinical-safety-engineer, final). Behavior criteria NOT YET APPLICABLE at Phase 0. Nothing counted as passing |
-| Session-limit incidents (this session) | none |
-| Claude Code | 2.1.294 (`claude --version`) |
+## Overall Status
 
-## Starting State (verified on resume)
+ClinNote is a working Android application for **synthetic development data**. The full consultation workflow runs end to end on an Android 14 emulator from a release APK: create patient → visit → consent → record (synthetic script) → transcript with speaker labels → stop → speaker-role confirmation → fact extraction → evidence from live public sources → clinical review → note → finalize → save → reopen after restart → second visit → what changed → export → offline access. No crash, and no JS or native-module error, appeared in logcat.
 
-- `main` at `63e1a19`, equal to `origin/main`. 42 modified files and 13 untracked files from the interrupted Stage A runs, all uncommitted.
-- Run-2 task list `~/.claude/tasks/session-b983a4a0`:
-  - A, B, C and E completed
-  - **D (Integration conclusion) pending**, blockedBy [1, 2, 3]
-- The run-2 safety re-check had issued Gate 6 documentation verdict **FAIL**: S2-02 and S2-14 (HIGH) were only partly fixed.
-- ADR-043 had been written afterwards, but:
-  - BUILD_PLAN was never aligned with it
-  - the synthesis cited by six documents did not exist
-  - PROJECT-STATUS claimed "all residuals fixed" and "QUALITY GATES: PASSED", which was premature (S3-08)
+It is **not** production-ready, clinically validated or approved by any regulator. Real-patient use is BLOCKED by owner decisions (see **Known Blockers**).
 
-## Agents Used
+| Gate (owner §29) | Result | Evidence |
+|---|---|---|
+| Core workflow works | TESTED | jest UI flow test + emulator E2E (§Android Build) |
+| Data persists | TESTED | restart tests (jest, new store instance) + emulator force-stop/relaunch |
+| Transcript works | TESTED (synthetic script + mocked recognizer); live microphone NOT TESTED | the emulator image has no speech service and no audio input |
+| AI extraction works | rule-based extraction TESTED; Gemini path TESTED with mocks only | no Gemini key exists (owner) |
+| Evidence works where configured | TESTED | 9 free public APIs live, 11/11 checks, plus a live run on the emulator |
+| Clinician review works | TESTED | unit + UI tests |
+| Note works | TESTED | unit + UI + emulator |
+| Return visit works | TESTED | workflow test + emulator ("Weight changed from 72 kg to 70 kg (−2 kg)") |
+| Export works | PARTIALLY TESTED | rendering and audit tested; on the emulator the share sheet opened, but no receiving app was exercised and the PDF file was not inspected |
+| Safety tests pass | TESTED | safety suites pass (counts under **Tests**) |
+| Security audit pass | TESTED (repository scan) | §Security |
+| Android build pass | TESTED | release APK built; launched and driven on the emulator |
 
-All agents were spawned as background in-process teammates, staged, with at most two active at once. backend-api-engineer was not spawned: the lead verified Task E (backend findings F-1…F-8) against ADR-042, the INTEGRATION-CONTRACTS entries and AGENT-TASK-GRAPH.
+## M3 Status
 
-| Agent | Task | Handoff | Result |
+**IMPLEMENTED + TESTED** (jest UI tests, emulator). There are 27 route files in `mobile/src/app`, built with Expo Router (ADR-049).
+
+| # | Screen | Route | Status |
 |---|---|---|---|
-| clinical-safety-engineer (`safety`) | C2: re-check of the HIGH findings, Gate 6, corpus coverage | `docs/agent-handoffs/2026-10-08-stage-a-resume-safety.md` (Addenda 1–7) | Found S2-02 and S2-14 still open, then S4-01, S4-02, S5-01 and S6-01…S6-04. Final: all RESOLVED; Gate 6 doc PASS. Added CS-45, CS-46, CS-04 D, CS-18 C, CS-19 C, CS-24 B, the CS-38 variants, and the coverage table |
-| evidence-research-engineer (`evidence`) | B2: E2/E3 re-check, pipeline, evidence filtering | `…-stage-a-resume-evidence.md` | E2/E3 all RESOLVED. New E4-01 (HIGH, the same issue as S4-01) and E4-02…E4-07, all resolved. Edited EVIDENCE-SOURCES §17 (pipeline, route table by FactCategory) and API_CATALOG privacy rows |
-| product-clinical-architect (`product`) | A2: P2/P3 re-check, workflow semantics | `…-stage-a-resume-product.md` | P2-02 and P3-01…P3-07 RESOLVED. New P4-01 (HIGH) and P4-02…P4-08, resolved by ADR-045 (P4-08 is an accepted trade-off). Edited PRODUCT_SPEC FR-11.1, FR-11.5, FR-12.2, FR-17.8 and FR-25.5 |
-| chief-architect (lead, this session) | lead fixes, ADR-044/045, Task D | `…-stage-a-team2-synthesis.md` | Integration conclusion: specifications mutually consistent |
+| 1 | Onboarding | `onboarding.tsx` (Stack.Protected) | TESTED (UI + emulator) |
+| 2 | Home | `(tabs)/index.tsx` | TESTED |
+| 3 | Patients | `(tabs)/patients.tsx` | IMPLEMENTED |
+| 4 | Patient Search | `search.tsx` | TESTED (emulator, offline) |
+| 5 | Patient Overview + Returning Patient | `patient/[patientId]/index.tsx` | TESTED |
+| 6 | Timeline (+ symptom course) | `patient/[patientId]/timeline.tsx` | TESTED (emulator opened; domain tests) |
+| 7 | Start Visit | `visit/start.tsx` | TESTED |
+| 8 | Consent | `visit/…/consent.tsx` | TESTED |
+| 9–10 | Live Recording + Live Transcript | `visit/…/record.tsx` | TESTED with the synthetic script; live microphone NOT TESTED |
+| — | Transcript (roles, correction, relabel, jump to time) | `visit/…/transcript.tsx` | TESTED (roles); correction domain-tested |
+| 11 | Clinical Facts (+ fact detail, conflicts, manual entry) | `visit/…/facts.tsx`, `fact/[factId].tsx` | TESTED |
+| 12 | Clinical Review | `visit/…/review.tsx` | TESTED |
+| 13 | Evidence | `visit/…/evidence.tsx` | TESTED (emulator, live) |
+| 14 | Medication (list + information) | `visit/…/medications.tsx`, `medication/[factId].tsx` | IMPLEMENTED; adapters live-tested |
+| 15 | Note Editor | `visit/…/note.tsx` | TESTED |
+| 16 | Follow-Up | `followups.tsx` | IMPLEMENTED |
+| 17 | Visit Comparison | `visit/…/compare.tsx` | TESTED |
+| 18 | Settings | `(tabs)/settings.tsx` | IMPLEMENTED |
+| 19 | Privacy | `privacy.tsx` | IMPLEMENTED |
+| 20 | About | `about.tsx` | IMPLEMENTED |
+| — | Visits tab, visit hub | `(tabs)/visits.tsx`, `visit/…/index.tsx` | IMPLEMENTED |
 
-## Tasks
+UI follows UI-UX §2: status always shown as text + icon, touch targets ≥ 48 dp, light/dark/system themes, accessibility labels and roles. Device testing found and fixed one defect: fixed bottom actions were hidden behind the navigation bar.
 
-| Task | Status |
+## M4 Status
+
+**PARTIALLY TESTED.** Tests, audits, release APK and emulator E2E are done. Remaining: a physical device, the live microphone, TalkBack, a Play-signed AAB, and the Gemini live call.
+
+## Implemented Features
+
+Encrypted local patient and visit records; consent gate; live recording with timer, pause/resume/stop and withdraw; DOCTOR/PATIENT/OTHER/UNKNOWN labels; speaker mapping; transcript correction (SOURCE_CHANGED); deterministic extraction with the AI path validated; provenance, information state and review status kept separate; conflicts kept and reviewable; derived views (medications, allergies, problems, follow-ups); evidence pipeline; R2 possibilities behind a default-off development flag; code-rendered notes with versions and finalize ≠ confirm; deterministic visit comparison; timeline and symptom course; follow-up management; local search; PDF/text export with draft marker and audit; offline manual mode.
+
+## Speech
+
+- Level 1 (live): Android `SpeechRecognizer` via expo-speech-recognition, preferring on-device recognition (ADR-048). It is IMPLEMENTED. The controller failure modes are TESTED with a mocked native module: permission denied, auto-restart after silence, stop after repeated failures, and a dangling partial committed on stop (`speech.test.ts`, 5/5). The live microphone is **NOT TESTED**: the emulator image has no speech service or audio input.
+- Level 2 (final transcript): Gemini transcription via the backend, for synthetic demo visits only (ADR-047). IMPLEMENTED; TESTED with mocks (backend 5/5); live call NOT TESTED (no key).
+- Temporary audio is captured only when it can be used (backend configured, cloud on, demo patient) and deleted after use or within 24 h (ADR-014).
+
+## Speaker Diarization
+
+The clinician tags the speaker live, and roles are confirmed on the Transcript screen before extraction (ADR-021): TESTED (UI test and emulator). Per-segment relabel flags dependent facts SOURCE_CHANGED: TESTED. Gemini diarization: mock-tested only.
+
+## AI
+
+- Backend: Supabase Edge Functions calling the Gemini free tier. `FREE_ONLY_MODE` is hard-on, there is an allowlist of free-tier models (verified 2026-10-09, API_CATALOG §31), and a 429 maps to QUOTA_EXHAUSTED with no retry and no paid fallback. This is TESTED (backend 5/5) but **not deployed** and the **live call is NOT TESTED**.
+- **Privacy gate (ADR-047, new):** the free tier may use submitted content to improve Google's products, so backend AI runs only for synthetic demo visits. TESTED: a non-demo visit never calls transcribe or runJob.
+- AI output is schema- and semantics-validated. Invented diagnosis, medication, dose, allergy, investigation, vital, physical finding and history items are discarded: TESTED (`hallucination.test.ts`, 9 categories plus a dose-change case).
+
+## Clinical Extraction
+
+Deterministic extraction runs on the device and is TESTED, including the owner-required cases:
+
+| Case | Result |
 |---|---|
-| A, B, C, E (run 2) | completed (previous session; verified on resume) |
-| C2, B2, A2 (resume) | completed (passed the TaskCompleted hook) |
-| D, Integration conclusion | **completed** (`2026-10-08-stage-a-team2-synthesis.md`) |
-| Remaining | none for Stage A. Owner review pending |
+| "Patient denies fever." | NEGATIVE |
+| "Allergies were not discussed." | NOT_DISCUSSED, never NKDA |
+| "Patient may have asthma." | PROVISIONAL, not CONFIRMED |
+| "I stopped my medication." | PATIENT_REPORTED, no discontinuation |
+| "Start amoxicillin." | CLINICIAN_STATED PLAN |
+| Medication correction (500 → 1000 mg) | both kept, open conflict, "Conflict — review" in the note |
 
-## Changes in This Session
+Other properties, all TESTED:
+- Provenance is assigned by code from the confirmed role.
+- AI never assigns CLINICIAN_CONFIRMED or MEASURED.
+- Numbers are preserved exactly. Number words are normalized to digits ("three weeks" → "3 weeks"), and the value is unchanged.
 
-**Decisions** (`docs/DECISIONS.md`):
-- **ADR-044:**
-  - value grounding (rule 17)
-  - concept key from the fact's own value (rule 16)
-  - context check for negation, hedge, hypothetical, other person and question, clause-scoped (rule 19)
-  - unclear audio (rule 18)
-  - conditional plans keep their condition
-- **ADR-045:**
-  - code-decided NOT_DISCUSSED
-  - visible discards
-  - keep-and-flag CONTEXT_UNCLEAR, with the allergy safety exception
-  - confirm requires a category
-  - note placeholder
-  - code-rendered comparison
-  - UNMAPPED re-extraction matching
-  - conditional advice is never a FollowUp
-- **OD-012** (caregiver/proxy consultations, owner, before Phase 10).
-- Annotations on ADR-033, ADR-038 and ADR-043.
+## Evidence APIs
 
-**Specification alignment:**
-- **AI.md:** §3 jobs 2, 9, 12, 14 and 15; §5.1 rules 8, 9, 13 and 16–20.
-- **DATA_MODEL:**
-  - §3 layered fact model table (source type, derivation, information status, confirmation status, lifecycle, historical, traceability)
-  - §3.2 (three provenance fields)
-  - §3.3a eligibility (SOURCE_CHANGED and CONTEXT_UNCLEAR excluded; allergy exception)
-  - §3.9 and §3.10 (CONTEXT_UNCLEAR)
-  - §4.5 (conceptKey, rootOriginProvenance)
-  - §4.15 fact-participation table for automatic evidence
-  - §4.16 (`factsChangedSinceRetrieval`)
-  - §4.17 (unreviewed count)
-  - §5.3 (CONTEXT_UNCLEAR transition)
-  - §6 rules 19–20
-  - §10.3 (allergy exception)
-- **BUILD_PLAN:** Phases 4, 5, 10, 11, 12, 13, 15 and 16 aligned with ADR-043, ADR-044 and ADR-045. It had not been updated for ADR-043.
-- **Other specs:**
-  - TESTING: §6 rows, S17, §13a's 21 minimum areas, the CS-01…CS-46 range
-  - PRODUCT_SPEC: FR-8.9, FR-16.1, FR-22.3, FR-25.5 and the workflow line
-  - UI-UX §2: label rows, plus Screen 11
-  - ARCHITECTURE §5 and §6.6
-  - API_CATALOG and EVIDENCE-SOURCES: FR-17.8 cross-reference, privacy rows, route table
-  - QUALITY-GATES Gate 6 range (safety)
-  - CLINICAL-SAFETY (safety)
-  - agent files: CS range
-- **Status files:** PROJECT-STATUS (every F-01…F-14 record kept and updated; S3-08 correction recorded), AGENT-STATUS, AGENT-SYSTEM, BUILD_REPORT, and the Task D synthesis.
+All free and keyless, all live-verified on 2026-10-09 (`LIVE_EVIDENCE=1 npx jest live`, **11/11 pass**). Every record carried a title, source, identifier, https URL and retrieval timestamp. Results:
 
-**Hooks** (`.claude/hooks/task_gate.py`), two defects found by live use and fixed with regression tests:
-1. relative `Handoff:` paths were resolved against the session cwd (a session in `docs/` failed)
-2. the dependency check silently skipped team task lists stored in a differently named directory
-
-**Repository:** `.gitignore` added (`__pycache__/`, `*.pyc`), so the hook bytecode created by live hook runs is never committed.
-
-## Commands and Tests Run (this session)
-
-| Command / check | Result |
+| Source | Live check result |
 |---|---|
-| `git status --short`, `git log`, `find`, reads of every governing document | starting state as above |
-| `python3 -I -m unittest discover -s .claude/hooks/tests` | **Ran 23 tests, OK** (21 before; 2 regression tests added) |
-| Live hook probe P1: ownerless TaskCreate | BLOCKED ("has no 'Owner: <agent-name>' line") |
-| Live hook probe P2: Tests-required, handoff without results | BLOCKED ("'## Tests' section has no test command/result counts") |
-| Live hook probe P3: Safety-sensitive without review | BLOCKED ("has no 'Safety review: PASS'") |
-| Live hook probe P4: dependent task with a pending blocker | **first NOT blocked (defect)**; after the fix BLOCKED ("depends on unfinished task(s) #9 (pending)") |
-| Live gate on a real handoff | evidence task #2 BLOCKED (missing `## Evidence`) until the handoff was fixed, then accepted |
-| Model-download guard (live) | blocked one of my own grep commands, because the search pattern contained an install-command string (false positive, fail-safe) |
-| Cross-reference audit (Python script): every ADR, OD and CS ID referenced in specs, agents, rules, CLAUDE.md and README exists; CS range = CS-01…CS-46; every cited handoff exists; required files exist | **PASS**: 45 ADRs, 12 ODs, 47 CS rows (CS-01…CS-46 + CS-16a), 0 broken references, 0 missing files; 14 agents, 7 rules, 4 orchestration files |
-| Secret scan of `git diff` additions and of docs/.claude/CLAUDE.md/README for `AIza…`, `sk-…`, `hf_…`, private-key headers, `*_API_KEY=` with a value | **0 secrets**. The only file hit is `.claude/rules/security-and-secrets.md`, which names the patterns as documentation |
-| Application and artifact scan (`*.ts/tsx/js/kt/java/sql`, `package.json`, model files, `.env*`, keystores, audio) | **none** (bytecode cache removed and git-ignored) |
-| `.claude/settings.json` JSON parse | valid |
-| Application tests | none exist (no application code) |
+| PubMed | 5 PMIDs, re-resolved |
+| Europe PMC | 5 |
+| MedlinePlus | 2 (medlineplus.gov only) |
+| ClinicalTrials.gov | 5 NCT ids (clinician request only) |
+| PubChem | CID 4091 |
+| NLM Clinical Tables | 6 suggestions |
 
-## Quality Gates
+Live search also ran on the emulator (state "done", 23.3 s). When nothing is retrieved, the screen shows **NO VERIFIED EVIDENCE FOUND** (UI test). Reference images are not shown: no source has a verified reuse license (OD-008).
 
-| Gate | Stage A status |
+## Medication APIs
+
+| Source | Live check result |
 |---|---|
-| Gate 6 (clinical safety) | **Documentation verdict PASS.** Criteria table in the synthesis §4: behavior criteria NOT YET APPLICABLE (the applicable CS set is empty at Phase 0, per §18a); "review completed" PASS. Gate 6 was **not** weakened; its range grew from CS-44 to CS-46 |
-| Gates 1–5, 7–10 | NOT YET APPLICABLE (no implementation) |
+| RxNorm | metformin → RxCUI 6809 |
+| DailyMed | 3 SPL set IDs |
+| openFDA label | 1 |
+| Drugs@FDA | 3 ANDA records |
+| openFDA recalls | 3 |
 
-## Agent-Team Result
+All TESTED live. **Two M2 adapter bugs were found and fixed:**
+1. openFDA RxCUI lists were joined with `+`, which is URL-encoded to `%2B` and matched nothing. Label, Drugs@FDA and recall lookups were silently empty. They now use explicit `OR`, with a regression test.
+2. RxNorm product lists now rank single-ingredient products first, so combination products no longer crowd out the products openFDA indexes.
 
-- **Spawned:** safety, evidence, product. All completed; all were released through shutdown_request → shutdown_approved.
-- **Limited by session:** none in this session. Runs 1 and 2 were limited, as recorded in the synthesis.
-- **Messaging:**
-  - evidence→safety, with a reply
-  - product→evidence, with a reply (arrived after product's first draft; FR-17.8 was revised)
-  - lead↔safety: 6 rounds
-- **Dependencies:** Task D blocked by A2, B2 and C2. The hook enforcement was verified live.
-- **Handoffs:** 3 resume handoffs and the synthesis.
+No automatic choice is made among several RxNorm candidates (CS-11), and doses are never altered.
 
-## API Status
+## Patient Storage
 
-No provider is verified for implementation. No API call was made and no key exists. API_CATALOG privacy rows were tightened (no patient identifiers).
+AES-256-GCM per-document encrypted JSON with atomic writes, and a Keystore-backed key (ADR-046, which supersedes ADR-013 and was recorded retrospectively): TESTED. `allowBackup=false`.
 
-## Security Status
+Performance fix: saving a visit no longer decrypts every visit of the patient. For 30 visits in Node this went from 475 ms to 22 ms.
 
-- No secrets in the diff or the repository.
-- Hooks are enabled: the secret/model-download guard, and the task quality gate (fixed this session).
-- No private keys anywhere.
+## Longitudinal Timeline
 
-## Privacy Status
+Timeline grouped by visit, with category filters, confirmed-only assessments, and provisional items labeled. The symptom course shows absence as "not discussed": TESTED (domain + UI).
 
-- Synthetic data only.
-- Example patient reference corrected to the `P-9xxxxx` test range.
-- Evidence queries carry sanitized clinical concepts only.
-- Caregiver speech has an interim rule (OD-012).
+## Returning Patient
 
-## Clinical-Safety Status
+The Patient Overview shows: last visit, what changed (a deterministic diff that shows both stated values with dates, labels provisional items, and invents no trend words), current confirmed medications, allergies, investigations, follow-up, symptom course, and proposed items needing review. TESTED (jest + emulator).
 
-- The specification is consistent. There are no open HIGH or MEDIUM safety findings.
-- Model text can no longer reach notes, comparisons or automatic evidence without deterministic grounding:
-  - value grounding, concept keys from values, and the context check (ADR-044)
-  - code-decided NOT_DISCUSSED, keep-and-flag, visible discards, and the allergy safety bias (ADR-045)
-- Safety corpus: 21 required areas, mapped to CS IDs.
-- All behavior tests are PENDING. Nothing has been demonstrated in code.
+## Export
 
-## Blockers
+Note export (PDF via expo-print, or plain text) and patient summary go through the share sheet with the UI-UX §4 warning. Draft exports carry "DRAFT — not finalized by clinician". Possibilities are never included. An AuditEvent is written for each export. Rendering, audit, the no-note error and offline export are TESTED. On the emulator the share sheet opened; the receiving app and PDF content are **NOT TESTED**.
 
-- **Phase 1:** none. It waits for the owner's explicit instruction.
-- **Later phases:** owner decisions OD-001, OD-002, OD-006, OD-007, OD-010, OD-011 and OD-012, plus the ADR-025 formal regulatory assessment (before any R2 release, before R3, and before Phase 24).
+## Security
+
+Repository scan on 2026-10-09 for `AIza`, `sk-`, `hf_`, `BEGIN PRIVATE KEY`, `GEMINI_/OPENAI_/ASSEMBLYAI_/DEEPGRAM_API_KEY=<value>` and `SUPABASE_SERVICE_ROLE`: **no secret values found**. The only matches are empty-value examples in hook tests and rule text.
+
+- `.env.example` files contain names only. No `.env` is committed.
+- The app uses only the `EXPO_PUBLIC_SUPABASE_URL/ANON_KEY` (public by design), `NCBI_EMAIL` and `APP_VARIANT` variables. No private key exists in mobile code or the APK.
+- No analytics, crash-reporting or tracking SDK is present.
+- Backend logs contain job name, outcome and duration only.
+
+**Permission audit** (merged release manifest, `aapt2 dump badging`): INTERNET, RECORD_AUDIO, VIBRATE (normal, no prompt, added by a library) and an internal androidx `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`. The following are explicitly blocked: location, contacts, SMS, phone, camera, storage/media, overlay, and (since this session) USE_BIOMETRIC/USE_FINGERPRINT. No notification permission is requested.
+
+NOT DONE: dependency CVE triage (`npm audit` reports advisories in build-time dependencies, not reviewed) and backend authentication (OD-004).
+
+## Privacy
+
+- Raw audio is temporary, captured only for demo visits with a configured backend, and deleted after use or within 24 h.
+- No voiceprints are kept.
+- Development fixtures are synthetic ("Demo Patient (synthetic)", "Test Person"). The demo uses P-000001, labeled DEMO DATA.
+- Evidence queries carry only sanitized clinical terms. The live test checked that no name or reference left the device.
+- No clinical text goes to logs or analytics.
+- Cloud processing is disclosed in onboarding, Settings, Consent and Privacy, including the free-tier training-use term.
+
+Open item: the PRIVACY §7 provider table still has VERIFY entries (processing location and retention per provider). No legal compliance is claimed.
+
+## Clinical Safety
+
+Every owner §16 and §17 case is TESTED (see **Clinical Extraction** and **AI**). In addition:
+
+- Citations must come from the retrieved bundle. Invented PMID, NCT, FDA/dose statements, probabilities, "final diagnosis" wording, invented fact ids and evidence-free possibilities are all rejected.
+- PMIDs that do not re-resolve are dropped. Malformed openFDA payloads are rejected.
+- R2 possibilities are off in production builds, verified on the emulator. They never enter notes or exports.
+- Finalizing a note confirms no fact, verified on the emulator ("Unreviewed facts at finalize: 11").
+- Allergies are never shown as NKDA unless confirmed.
+
+## Tests
+
+Commands run on 2026-10-09 in the Codespace (Node v24.21.0, jest-expo 57):
+
+| Command | Result |
+|---|---|
+| `npx tsc --noEmit` (mobile) | clean |
+| `CI=1 npx expo lint` | 0 problems |
+| `npx expo-doctor` | 21/21 checks passed |
+| `npx jest` | **123 passed, 0 failed, 11 skipped** (the live suite is opt-in). 10 test files cover safety (extraction, downstream, hallucination), pipeline/provider failure, storage, end-to-end workflow, speech failure modes, Expo Router UI (9 tests incl. the full consent→finalize flow) and Node performance |
+| `LIVE_EVIDENCE=1 npx jest src/__tests__/live.test.ts` | 11/11 passed (real network) |
+| `cd backend && npm test` / `npm run typecheck` | 5/5 passed / clean |
+
+Failure scenarios TESTED, all with no data loss:
+- Gemini unavailable
+- speech/transcription failure
+- network offline
+- evidence provider failure
+- malformed AI JSON
+- free quota exhausted (one call, no retry, no paid fallback)
+- microphone permission denied (mock)
+- recording interrupted, with an unfinished visit recovered after restart
+- application restart
+- export failure
+
+Flaky tests: none observed.
+
+## Android Build
+
+Build path: free local Gradle build (no EAS account needed). JDK 21, Android SDK cmdline-tools/platform 36, NDK via Gradle, `npx expo prebuild --platform android`, then:
+
+```
+cd mobile/android && ./gradlew assembleRelease bundleRelease -PreactNativeArchitectures=arm64-v8a \
+  -Pkotlin.compiler.execution.strategy=in-process "-Dorg.gradle.jvmargs=-Xmx3g" --max-workers=2 --no-daemon
+```
+
+1. **First attempt: FAILED.** The JVM was killed during C++ compilation: memory pressure on the 7.9 GB host from Gradle, the Kotlin daemon and concurrent jest. There was no compiler error.
+2. **Retry with an in-process Kotlin compiler: BUILD SUCCESSFUL in 25m 53s.**
+3. A permission rebuild succeeded in 20m 47s.
+4. An x86_64 variant for the emulator succeeded in 11m 34s.
+
+5. The final arm64 APK + AAB build succeeded in 4m 27s (artifacts below).
+
+**Emulator E2E** (Android 14 AOSP x86_64 AVD, headless, software GPU, 2 vCPU; release APK `ai.clinnote.app` 1.0.0, driven by adb/uiautomator scripts kept outside the repository):
+- PASS: app launches; onboarding with explicit acknowledgement; Home empty state
+- PASS: synthetic demo patient P-000001 with DEMO label; allergy status "Not discussed"
+- PASS: "● RECORDING" timer screen; DOCTOR/PATIENT labels; roles confirmed
+- PASS: facts with PATIENT_REPORTED and "Transcript T-0002"; fever "denied / absent"
+- PASS: live evidence search done with identifiers; no possibilities in the production build
+- PASS: note generated and finalized; export share sheet opened
+- PASS: second visit; force-stop and relaunch with data intact; "Weight changed from 72 kg to 70 kg"; timeline
+- PASS: airplane mode — app opens and local search finds P-000001
+- PASS: no ClinNote entry in the logcat crash buffer; 0 ReactNativeJS/native-module errors
+
+Defects found on the device and fixed:
+- bottom actions were hidden behind the navigation bar
+- the demo status claimed the microphone was listening
+
+The emulator's own launcher showed an ANR dialog once; the test driver dismissed it.
+
+**Measured timings (emulator: software-rendered, 2 vCPU host — NOT representative of a phone):**
+
+| Step | Time |
+|---|---|
+| Cold launch to onboarding | 9.8 s / 18.2 s (first install) |
+| Cold launch with data | 10.1 s |
+| Stop → transcript | 2.4 s |
+| Extraction → facts | 6.1 s / 5.8 s |
+| Evidence search (live network) | 23.3 s |
+| Patient overview load | 2.2 s |
+
+Node (not device) timings: load a 30-visit patient 0.5–1.3 s; save a visit 22 ms; timeline / compare / note / export ≤ 7 ms. Physical-device performance is NOT TESTED.
+
+### Android Build — Artifacts
+
+Final build (source = commit `84f94aa`): `./gradlew assembleRelease bundleRelease -PreactNativeArchitectures=arm64-v8a …` → **BUILD SUCCESSFUL in 4m 27s**. The artifacts are stored outside the repository, in `~/clinnote-artifacts/` in the Codespace; they are not committed.
+
+| Artifact | Available? | Path | SHA-256 |
+|---|---|---|---|
+| APK (arm64-v8a, release, installable) | **YES** | `~/clinnote-artifacts/ClinNote-1.0.0-arm64-v8a-release.apk` (44.4 MB) | `0af81800264725004cf90dff24eb223a1f1a78767227b3d4fec089fa9a0a467f` |
+| APK (x86_64, emulator test build) | YES | `~/clinnote-artifacts/ClinNote-1.0.0-x86_64-release.apk` | `4b33cc20c387c140d9bf33c56028c83054913112ba5ba7ef0dbbec55b55f26c5` |
+| AAB (arm64-v8a) | **YES, but NOT uploadable to Google Play** | `~/clinnote-artifacts/ClinNote-1.0.0-release.aab` (33.7 MB) | `27959d78622941652c091b8ff3bcfdc775fd46f6ab6c3e95965f9d98f97d7d86` |
+
+- **Signing:** both are signed with the Android **debug** certificate (`CN=Android Debug`), which is the Expo template's default for release builds. A Play-uploadable AAB needs the owner's upload key or EAS-managed credentials, and should include all ABIs (`reactNativeArchitectures` default). **BLOCKED** on owner credentials; not pretended.
+- Application id `ai.clinnote.app` (provisional, ADR-049), versionCode 1, versionName 1.0.0, targetSdk 36. The build variant resolves to `production` (no `EXPO_PUBLIC_APP_VARIANT` set), so R2 cannot be enabled.
+- The emulator E2E ran on the x86_64 build made before the final one-line demo-label fix (`84f94aa`). That fix and the arm64 APK itself have not been run on a device.
+
+## Free-Only Verification
+
+| Provider | Purpose | Free? | Credential? | Paid fallback? | Data sent |
+|---|---|---|---|---|---|
+| Android SpeechRecognizer (device) | live transcript | yes | none | none | audio to the device's speech service (on-device preferred) |
+| Google Gemini API, free tier (via Supabase function) | final transcript, extraction, R2 possibilities | yes (verified 2026-10-09; free-tier content used to improve Google products → synthetic only, ADR-047) | server-side key, not yet created | **none** (`FREE_ONLY_MODE`, model allowlist, 429 → QUOTA_EXHAUSTED) | demo-visit audio/transcript only |
+| Supabase Edge Functions | key custody, routing | free plan (VERIFY at project creation) | anon key (public) | none | in transit only |
+| RxNorm, DailyMed, openFDA, PubMed, Europe PMC, MedlinePlus, ClinicalTrials.gov, PubChem, NLM Clinical Tables | evidence/terminology | yes, keyless | none | none | sanitized clinical terms; public identifiers |
+| Local Gradle build / Android SDK / emulator | build and test | yes | none | n/a | none |
+
+No paid service is configured or reachable from the code. No model weights were downloaded. The emulator system image is an OS image, not an AI model.
+
+## API Keys Required
+
+None for the current synthetic-data functionality. Optional, all created by the owner only:
+- `GEMINI_API_KEY`: backend secret, in a Google Cloud project **without billing**.
+- `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`: public values, set after deploying the functions.
+- `EXPO_PUBLIC_NCBI_EMAIL`: optional.
+
+## Known Limitations
+
+- Live microphone transcription has not been verified on hardware.
+- The Gemini path has never been run against the real API.
+- Diarization for real patients relies on live tagging plus clinician confirmation.
+- Clinician sign-in (FR-28.4) is not implemented.
+- Note type is chosen in the editor, not on Start Visit.
+- Manual vital entry does not parse numeric attributes.
+- Search scans decrypted documents in memory.
+- No TalkBack or font-scaling audit has been run on a device.
+- PDF content and share targets have not been inspected.
+- No GitHub Actions CI exists yet.
+
+## Known Blockers
+
+All need the owner:
+1. The free-only rule conflicts with data terms for real-patient AI: the Gemini free tier may use content for product improvement (ADR-047, OD-002).
+2. OD-001 speech provider for production.
+3. OD-004 backend authentication.
+4. OD-006 retention.
+5. OD-011 target markets.
+6. The ADR-025 formal regulatory assessment before any R2 release.
+7. Google Play: developer account, upload key / Play App Signing, Data Safety form, privacy policy URL, support contact.
+8. Expo account for EAS builds (optional; a local build works).
 
 ## Git
 
-- Branch `main`.
-- Commit `docs: complete ClinNote Stage A specification reconciliation`. The hash is recorded in `terminal_report.txt` and `git log`.
-- Push to `origin main` per CLAUDE.md §14 after all verifications passed.
+Branch `feat/v1-app`, ahead of `main`.
 
-## Next Action
+| Commit | Description |
+|---|---|
+| `72d96d9` | M1 |
+| `c652e57` | M2 |
+| `1874258` | feat: complete ClinNote consultation workflow |
+| `4eacbe8` | test: complete ClinNote validation suite |
+| `f4efc06` | feat: complete clinical evidence review |
+| `247d37c` | fix: save a visit without decrypting every visit |
+| `84f94aa` | fix: device-tested bottom actions, permissions and demo status |
 
-The project owner reviews Stage A. On explicit instruction, start BUILD_PLAN **Phase 1: Repository Foundation**. **Not started in this session.**
+Generated `mobile/android/` is git-ignored (Continuous Native Generation). APK/AAB artifacts are not committed.
+
+## Commit
+
+See the terminal report entry for the final docs commit hash and push result.
+
+## Next Human Action
+
+1. Review and merge `feat/v1-app` into `main` (pushed to `origin/main` per the standing instruction if all verification passes; see the terminal report).
+2. Install the APK on a physical Android phone and test the live microphone with synthetic speech only.
+3. Decide the AI path for real patients (ADR-047/OD-002) and the speech provider (OD-001).
+4. If wanted: create a Google Cloud project **without billing** and a Gemini key, deploy the Supabase functions, then set the public URL and anon key for a demo-data AI run.
+5. Create the Play developer account and upload key; commission the ADR-025 regulatory assessment.

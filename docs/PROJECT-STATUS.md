@@ -4,55 +4,55 @@ Single source of truth for current phase and status. Updated from evidence only.
 
 ## Current Phase
 
-STAGE A — SPECIFICATION RECONCILIATION (Phase 0 close-out)
+V1 APPLICATION BUILD — M3 (UI + end-to-end workflow) and M4 (tests, audits, Android build). Branch `feat/v1-app`. Updated 2026-10-09 from repository evidence (see `docs/BUILD_REPORT.md`).
 
 ## Application Implementation
 
-NOT STARTED. No application code exists. Phase 1 has not started and starts only on explicit project-owner instruction.
+IMPLEMENTED (M1 domain + encrypted storage + safety engine; M2 providers; M3 all screens and workflow; M4 test suite and audits). This is a development build for synthetic data only. It is not clinically validated and has no regulatory approval.
+
+| Milestone | Status | Evidence |
+|---|---|---|
+| M1 Domain, encrypted JSON storage, deterministic safety engine | TESTED | commit `72d96d9`; jest safety + storage suites |
+| M2 Speech, Gemini backend, evidence adapters, visit pipeline | TESTED (Gemini live call NOT tested: no key exists) | commit `c652e57`; backend 5/5; 9 public evidence APIs live-verified 2026-10-09 (2 adapter bugs fixed) |
+| M3 UI screens and end-to-end workflow | TESTED (jest UI tests); NOT tested on a device | commits `1874258`, `f4efc06`; 25 routes; UI flow test consent → record → transcript → extraction → note → finalize |
+| M4 Tests, audits, Android build, reports | PARTIALLY TESTED: release APK + AAB built (debug-signed); full synthetic workflow passed on an Android 14 emulator; no physical device, live microphone or Play signing | commits `4eacbe8`, `247d37c`, `84f94aa`; BUILD_REPORT |
 
 ## Status
 
-- Phase 0 documentation: verified (2026-10-08).
-- Phase 0 multi-agent system: 14 agents.
-  - Stage A run 2 spawned a real agent team.
-  - The Stage A resume session re-validated it with staged teammates (safety, evidence, product).
-  - Evidence: `docs/agent-handoffs/2026-10-08-stage-a-team2-synthesis.md` §5.
-- Stage A reconciliation: **complete at the documentation level** (2026-10-08, resume session).
-  - F-01…F-14 are resolved in the specifications (ADR-021 to ADR-045).
-  - Every residual finding from runs 1 and 2 and the resume session is dispositioned in the team-2 synthesis (Task D).
-  - Gate 6 documentation verdict: **PASS** (clinical-safety-engineer, final). Behavior criteria are NOT YET APPLICABLE at Phase 0.
-  - Project-owner review is pending.
-- Correction of an earlier claim (S3-08): an earlier version of this section said that all residuals were fixed and cited a synthesis that did not yet exist. That was premature. Two HIGH findings (S2-02, S2-14) were still open, and the resume session found further HIGH findings (S4-01/E4-01, P4-01, S6-01). All are now resolved (ADR-044, ADR-045).
+- Tests (2026-10-09): mobile 123 passed / 0 failed (11 live tests opt-in, skipped in CI; live run 11/11); backend 5/5; `tsc` clean; `expo lint` 0 problems; `expo-doctor` 21/21; emulator E2E all PASS.
+- Privacy gate ADR-047: free-tier Gemini is used only for synthetic demo visits (free-tier content may be used to improve Google's products).
+- Decisions recorded retrospectively: ADR-046 (encrypted JSON store, supersedes ADR-013), ADR-048 (provisional free-only providers). ADR-049 records the M3 choices.
+- Production use is BLOCKED by owner decisions: OD-001, OD-002 (+ the free-only vs. data-terms conflict, ADR-047), OD-004, OD-006, OD-011, the ADR-025 regulatory assessment, Play account and signing.
 
 ## Phase Table
 
 | Phase | Name | Status |
 |---|---|---|
-| 0 | Documentation + multi-agent system (Stage A reconciliation) | IN_PROGRESS — awaiting owner review of Stage A |
-| 1 | Repository Foundation | NOT_STARTED |
-| 2 | Expo and Android Foundation | NOT_STARTED |
-| 3 | UI System | NOT_STARTED |
-| 4 | Local Database | NOT_STARTED |
-| 5 | Patient System | NOT_STARTED |
-| 6 | Visit System (+ safety test corpus) | NOT_STARTED |
-| 7 | Recording (+ 7B backend foundation) | NOT_STARTED |
-| 8 | Speech | NOT_STARTED |
-| 9 | Speaker Diarization | NOT_STARTED |
-| 10 | Clinical Extraction | NOT_STARTED |
-| 11 | Medication Intelligence | NOT_STARTED |
-| 12 | Evidence Engine | NOT_STARTED |
-| 13 | AI Reasoning | NOT_STARTED |
-| 14 | Clinical Review | NOT_STARTED |
-| 15 | Note Generation | NOT_STARTED |
-| 16 | Longitudinal Memory | NOT_STARTED |
-| 17 | Follow-Up | NOT_STARTED |
-| 18 | Export | NOT_STARTED |
-| 19 | Security | NOT_STARTED |
-| 20 | Privacy | NOT_STARTED |
-| 21 | Testing | NOT_STARTED |
-| 22 | Performance | NOT_STARTED |
-| 23 | Android Build | NOT_STARTED |
-| 24 | Google Play | NOT_STARTED |
+| 0 | Documentation + multi-agent system | IMPLEMENTED (Stage A complete; owner review pending) |
+| 1 | Repository Foundation | PARTIALLY_TESTED (no GitHub Actions CI yet) |
+| 2 | Expo and Android Foundation | TESTED (release build + emulator launch) |
+| 3 | UI System | PARTIALLY_TESTED (jest UI tests; no device/TalkBack test) |
+| 4 | Local Database (encrypted JSON, ADR-046) | TESTED |
+| 5 | Patient System | TESTED |
+| 6 | Visit System (+ safety test corpus) | TESTED |
+| 7 | Recording (+ 7B backend foundation) | PARTIALLY_TESTED (mocked recognizer; backend not deployed) |
+| 8 | Speech | PARTIALLY_TESTED (Android recognizer mocked; Gemini transcription not live-tested) |
+| 9 | Speaker Diarization | PARTIALLY_TESTED (live tagging + clinician mapping tested; Gemini diarization mocked) |
+| 10 | Clinical Extraction | TESTED (rule-based); AI path tested with mocks only |
+| 11 | Medication Intelligence | TESTED (RxNorm/DailyMed/openFDA live) |
+| 12 | Evidence Engine | TESTED (9 public sources live) |
+| 13 | AI Reasoning (R2 possibilities) | IMPLEMENTED behind default-off dev flag; mock-tested; release BLOCKED (ADR-025) |
+| 14 | Clinical Review | TESTED |
+| 15 | Note Generation | TESTED |
+| 16 | Longitudinal Memory | TESTED |
+| 17 | Follow-Up | PARTIALLY_TESTED |
+| 18 | Export | PARTIALLY_TESTED (rendering/audit tested; PDF + share sheet need a device) |
+| 19 | Security | PARTIALLY_TESTED (secret/permission audit; no dependency CVE triage) |
+| 20 | Privacy | PARTIALLY_TESTED (provider table still has VERIFY entries) |
+| 21 | Testing | PARTIALLY_TESTED (no device/E2E-on-device tests) |
+| 22 | Performance | PARTIALLY_TESTED (Node-only timings; no device measurements) |
+| 23 | Android Build | TESTED for debug-signed APK/AAB + emulator E2E; Play-signed AAB BLOCKED (owner credentials) |
+| 24 | Google Play | BLOCKED (owner: Play account, upload key, Data Safety, regulatory assessment) |
 | 25 | Final Release Audit | NOT_STARTED |
 
 ## Allowed Status Values
