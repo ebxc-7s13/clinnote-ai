@@ -276,3 +276,21 @@ NEXT ACTION: owner installs ClinNote-1.1.0-arm64-v8a-release.apk (uninstall 1.0.
   higher versionCode, same debug key) and tests live microphone, pause/resume, add-more and a non-English language.
 COMMITS: 49ddfc8 (feat: domain/services/tests), 3ff318b (feat: UI 1.1.0), docs commit — see below.
 PUSH: 49ddfc8, 3ff318b, 7fa5e21 pushed to origin main (82759bc..7fa5e21), verified by git push output.
+
+===== 2026-10-09T15:26:19Z — ClinNote 1.2.0 public GitHub release preparation =====
+STATUS: PARTIALLY COMPLETED — release prepared and verified; publication BLOCKED (visibility 403; release creation needs owner approval)
+TASK COMPLETED: history/secret audit (gitleaks: no leaks), license audit, MIT LICENSE, PRIVACY.md, SECURITY.md, CHANGELOG.md,
+  CONTRIBUTING.md, THIRD_PARTY_NOTICES.md, README rewrite, .gitignore, CI, issue templates, original icon (Expo logo removed),
+  in-app policy links, ADR-055, DEPLOYMENT §9a release procedure, release-signed 1.2.0 APK built and verified.
+FILES CHANGED: 37 in e5509db + docs/BUILD_REPORT.md, terminal_report.txt
+COMMANDS RUN: gitleaks git/dir; npm ls/audit; tsc; expo lint; jest; expo-doctor; backend test/typecheck; build-release.sh;
+  apksigner/aapt2/zipalign; x86_64 assembleRelease; emulator run11.py; gh run watch; gh repo edit (403)
+TESTS RUN / RESULTS: jest 161 passed / 0 failed / 11 skipped; backend 5/5; tsc clean; lint 0; expo-doctor 21/21;
+  CI run 37951192605 success (mobile, backend, secret-scan); emulator acceptance PASS, 0 crashes;
+  1.1.0 -> 1.2.0 in-place update refused (INSTALL_FAILED_UPDATE_INCOMPATIBLE) as documented
+ARTIFACT: ~/clinnote-artifacts/release-v1.2.0/ClinNote-1.2.0-arm64-v8a-release.apk 44,365,613 B
+  SHA-256 9291fb3efbc94d272da6e6ac204c545f17f239fdf688ed22f4a2db90fad3f9a7
+  cert SHA-256 94a47ba688db35c153056400af52cf75cee67428c98d714d5dc81ebe661d4d99 (release key, not debug)
+RISKS: npm audit 62 advisories (0 critical; mostly tooling) open; 1.2.0 not tested on a physical phone; release key only in Codespace
+BLOCKERS: repository still PRIVATE (token lacks admin); tag v1.2.0 and GitHub Release NOT created (permission denied in session)
+NEXT ACTION: owner backs up ~/.clinnote-signing/, makes repo public, creates release (commands in docs/BUILD_REPORT.md)
