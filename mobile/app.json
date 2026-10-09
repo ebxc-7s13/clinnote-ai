@@ -1,21 +1,43 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "ClinNote",
+    "slug": "clinnote",
+    "scheme": "clinnote",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "ai.clinnote.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.SEND_SMS",
+        "android.permission.RECEIVE_SMS"
+      ],
+      "allowBackup": false,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -26,7 +48,20 @@
       "expo-status-bar",
       "expo-speech-recognition",
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#F4F6F8",
+          "dark": {
+            "backgroundColor": "#0E1419"
+          }
+        }
+      ],
+      "expo-asset",
+      "expo-font"
     ]
   }
 }

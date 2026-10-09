@@ -3,9 +3,8 @@
  * opened; nothing is overwritten. Compares facts eligible for automatic input only (§3.3a).
  */
 import { isEligible } from './facts';
-import { durationDays } from './text';
 import type { ClinicalFact, FactConflict, Visit } from './types';
-import { cmp } from './text';
+import { cmp, durationDays } from './text';
 import { newId, nowIso } from './util';
 
 const WITHIN_VISIT = new Set(['SYMPTOM', 'HISTORY_MEDICAL', 'HISTORY_SURGICAL', 'HISTORY_FAMILY', 'HISTORY_SOCIAL', 'MEDICATION', 'ALLERGY', 'ASSESSMENT']);

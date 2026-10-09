@@ -49,7 +49,7 @@ export class VisitService {
     audit(v, 'CONSENT', v.visitId, 'CONSENT_RECORDED');
   }
 
-  addLiveSegment(v: Visit, text: string, confidence: number, role: SpeakerRole, start: number, end: number): TranscriptSegment {
+  addLiveSegment(v: Visit, text: string, confidence: number, role: SpeakerRole, start: number, end: number, sourceProvider = 'android-speechrecognizer'): TranscriptSegment {
     const s: TranscriptSegment = {
       segmentId: newId(),
       displayCode: `T-${pad(v.segments.length + 1, 4)}`,
@@ -63,10 +63,34 @@ export class VisitService {
       rawConfidence: confidence > 0 ? confidence : undefined,
       isFinal: true,
       editedByClinician: false,
-      sourceProvider: 'android-speechrecognizer',
+      sourceProvider,
     };
     v.segments.push(s);
     return s;
+  }
+
+  startRecording(v: Visit) {
+    if (v.consent?.state !== 'CONFIRMED') throw new Error('Consent must be confirmed before recording.');
+    v.recordingState = 'RECORDING';
+    v.transcriptState = 'IN_PROGRESS';
+    audit(v, 'VISIT', v.visitId, 'RECORDING_STARTED');
+  }
+
+  /** Stop keeps every captured segment; the live transcript is the transcript until a validated final one exists. */
+  stopRecording(v: Visit, durationSec: number) {
+    v.recordingState = 'STOPPED';
+    v.recordingDurationSec = Math.max(v.recordingDurationSec, Math.round(durationSec));
+    v.endedAt = nowIso();
+    v.transcriptState = v.segments.length ? 'COMPLETED' : 'FAILED';
+    v.transcriptSource = v.segments.length ? 'LIVE_DEVICE' : 'NONE';
+    audit(v, 'VISIT', v.visitId, 'RECORDING_STOPPED');
+  }
+
+  /** Withdrawn consent: recording stops; nothing captured after this point. Existing text stays for the clinician to delete. */
+  withdrawConsent(v: Visit) {
+    if (v.consent) v.consent.state = 'WITHDRAWN';
+    v.recordingState = 'STOPPED';
+    audit(v, 'CONSENT', v.visitId, 'CONSENT_WITHDRAWN');
   }
 
   /**
