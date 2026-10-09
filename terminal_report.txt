@@ -275,3 +275,4 @@ BLOCKERS: owner decisions OD-001, OD-002 (+ADR-047), OD-004, OD-006, OD-011, ADR
 NEXT ACTION: owner installs ClinNote-1.1.0-arm64-v8a-release.apk (uninstall 1.0.0 not required; same package,
   higher versionCode, same debug key) and tests live microphone, pause/resume, add-more and a non-English language.
 COMMITS: 49ddfc8 (feat: domain/services/tests), 3ff318b (feat: UI 1.1.0), docs commit — see below.
+PUSH: 49ddfc8, 3ff318b, 7fa5e21 pushed to origin main (82759bc..7fa5e21), verified by git push output.
