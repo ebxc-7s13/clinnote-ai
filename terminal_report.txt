@@ -181,3 +181,70 @@ None for Phase 1. Future: owner decisions OD-001/002/006/007/010/011/012 and the
 ## Next Phase
 PHASE 1 — REPOSITORY / APPLICATION FOUNDATION
 NOT STARTED IN THIS SESSION. Awaits explicit owner authorization.
+
+===== 2026-10-09T03:08:13Z — M3/M4: workflow UI, validation suite, Android build =====
+
+STATUS: M3 TESTED (jest UI + emulator); M4 PARTIALLY TESTED. Development build for SYNTHETIC data only.
+NOT production-ready, NOT clinically validated, no regulatory approval.
+
+TASK COMPLETED
+- M3: 27 Expo Router routes covering all 20 required screens + visit hub, transcript, fact detail.
+  Full flow: patient → visit → consent → record (synthetic script) → speaker labels → stop →
+  role confirmation → extraction → evidence → review → note → finalize → save → restart →
+  2nd visit → what changed → export → offline.
+- M4: test suite, live provider checks, security/privacy/permission/free-only audits, release
+  APK + AAB, emulator E2E.
+- Fixes found by testing:
+  - openFDA OR-query bug (%2B, lookups silently empty)
+  - RxNorm product ranking
+  - saveVisit decrypting every visit (475 → 22 ms)
+  - bottom actions hidden behind the nav bar
+  - demo "microphone listening" label
+  - biometric permissions blocked
+- Privacy gate ADR-047: the free Gemini tier may use content for product improvement → backend AI
+  only for synthetic demo visits.
+- ADRs recorded: ADR-046 (encrypted JSON, supersedes ADR-013; retrospective), ADR-048 (provisional
+  providers), ADR-049 (M3 choices). API_CATALOG §31 verification log filled.
+
+FILES CHANGED: mobile/src/app/** (new), mobile/src/{domain,application,presentation,providers}/**,
+  mobile/src/__tests__/** (5 new files), mobile/app.json, mobile/package*.json, mobile/eas.json,
+  mobile/eslint.config.js, docs/{DECISIONS,API_CATALOG,PROJECT-STATUS,BUILD_REPORT}.md
+
+COMMANDS RUN
+- npx tsc --noEmit; CI=1 npx expo lint; npx expo-doctor; npx jest
+- LIVE_EVIDENCE=1 npx jest live; backend npm test / npm run typecheck
+- npx expo prebuild --platform android; ./gradlew assembleRelease bundleRelease (arm64-v8a; x86_64 for the emulator)
+- emulator (Android 14 AOSP x86_64) + adb/uiautomator drive
+
+TESTS RUN / RESULTS
+- tsc clean | lint 0 problems | expo-doctor 21/21
+- jest 123 passed, 0 failed, 11 skipped (opt-in live) | live 11/11 | backend 5/5
+- emulator E2E: all PASS, 0 crashes, 0 JS/native-module errors
+- builds:
+  - 1st: FAILED (JVM killed, memory)
+  - retry: SUCCESS 25m53s
+  - final: SUCCESS 4m27s
+- artifacts (outside the repo, ~/clinnote-artifacts):
+  - ClinNote-1.0.0-arm64-v8a-release.apk  sha256 0af81800…a467f
+  - ClinNote-1.0.0-release.aab            sha256 27959d78…7d86
+  - both debug-signed; the AAB is NOT Play-uploadable
+
+RISKS
+- live microphone, Gemini live call, physical device, TalkBack, PDF content: NOT TESTED
+- npm audit advisories not triaged
+
+BLOCKERS (owner)
+- free-only vs. AI data terms for real patients (ADR-047 / OD-002)
+- OD-001, OD-004, OD-006, OD-011
+- ADR-025 regulatory assessment
+- Play account + upload key
+- Gemini key (no billing) + Supabase deploy, if AI on demo data is wanted
+
+DEPENDENCIES: none new at runtime besides expo-keep-awake/expo-asset/expo-font (expo install);
+  dev: eslint-config-expo, @testing-library/react-native.
+
+HANDOFF: docs/BUILD_REPORT.md (full evidence), docs/PROJECT-STATUS.md
+
+NEXT ACTION: owner installs the arm64 APK on a phone (synthetic speech only); decides ADR-047/OD-002 and OD-001.
+
+GIT: branch feat/v1-app (eb8af93), fast-forwarded into main and pushed — the result is in the next lines of this entry.
