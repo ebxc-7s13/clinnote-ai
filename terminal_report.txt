@@ -248,3 +248,4 @@ HANDOFF: docs/BUILD_REPORT.md (full evidence), docs/PROJECT-STATUS.md
 NEXT ACTION: owner installs the arm64 APK on a phone (synthetic speech only); decides ADR-047/OD-002 and OD-001.
 
 GIT: branch feat/v1-app (eb8af93), fast-forwarded into main and pushed — the result is in the next lines of this entry.
+PUSH (verified): origin main 737c414..c42dc7f (fast-forward of feat/v1-app; main == origin/main). This line is committed in a follow-up docs commit.
