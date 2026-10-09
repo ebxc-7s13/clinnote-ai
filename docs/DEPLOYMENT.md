@@ -74,15 +74,34 @@ CD to Google Play is manual (upload or EAS Submit) after the checklist in `GOOGL
 ## 8. Android Builds, AAB and Signing
 
 - Production artifact: Android App Bundle (AAB).
-- Signing: EAS-managed credentials or owner-held upload keystore; never in Git. Google Play App Signing is expected — VERIFY current requirement.
-- `versionCode` increments every upload; `versionName` follows semantic versioning.
-- Target SDK set to the level Google Play currently requires (VERIFY at Phase 23).
+- Signing (ADR-054): Google Play App Signing with an owner-held upload keystore in `~/.clinnote-signing/`, never in Git; injected at prebuild by `mobile/plugins/withReleaseSigning.js`; release tasks fail without it (no debug fallback). Procedure and backup: `GOOGLE-PLAY.md` §11. EAS-managed credentials remain an option.
+- Local release build: `bash mobile/scripts/build-release.sh` (AAB + arm64-v8a APK into `~/clinnote-artifacts/`, verified signature, 16 KB alignment check).
+- `versionCode` increments every upload (1.2.0 = 3); `versionName` follows semantic versioning.
+- Target SDK: API 36, which Google Play requires for new apps and updates from August 31, 2026 (verified 2026-10-09).
 
 ## 9. Release Management
 
 - Branches: feature branches → `main`; release tags `vX.Y.Z`.
 - Each release has: changelog, test results, `BUILD_REPORT.md` update, Play track (internal → closed → production), staged rollout percentages for production.
 - Backend deployments are versioned and deployed before app releases that depend on them; backend remains backward compatible with the previous app version.
+
+## 9a. GitHub Releases Distribution (ADR-055)
+
+Public distribution is through GitHub Releases (Google Play is paused). Manual, verified release; no automatic publication from CI.
+
+1. Update the version: `mobile/app.json` `expo.version` and `android.versionCode` (+1), `mobile/package.json` `version`; add a `CHANGELOG.md` entry.
+2. Run the checks from `mobile/`: `npm run typecheck`, `CI=1 npm run lint`, `npm test`, `npx expo-doctor`; `backend/`: `npm test`, `npm run typecheck`; gitleaks over the full history.
+3. Build: `bash mobile/scripts/build-release.sh` (release key from `~/.clinnote-signing/`; artifacts in `~/clinnote-artifacts/`, never overwritten).
+4. Verify signing: `apksigner verify --print-certs` shows SHA-256 `94a47ba688db35c153056400af52cf75cee67428c98d714d5dc81ebe661d4d99` (not `CN=Android Debug`); `aapt2 dump badging` shows `ai.clinnote.app`, the new versionCode/versionName and the expected permissions.
+5. Checksum: `ClinNote-<version>-SHA256SUMS.txt` written by the script; publish it as `SHA256SUMS.txt`.
+6. Install the APK on an emulator/device (clean install) and run the smoke workflow.
+7. Commit, push `main`, and tag: `git tag -a vX.Y.Z -m "ClinNote X.Y.Z" && git push origin vX.Y.Z`.
+8. Create the release: `gh release create vX.Y.Z <apk> SHA256SUMS.txt --title "ClinNote X.Y.Z" --notes-file <notes.md> --verify-tag`.
+9. Release notes: summary, changes, architecture, install steps, limitations, free-only and clinical-safety notes, checksum and certificate fingerprint.
+10. Verify the public download: `gh release download vX.Y.Z` into an empty directory and `sha256sum -c SHA256SUMS.txt`; check the asset list contains no keystore or private file.
+11. Update `CHANGELOG.md`, `docs/BUILD_REPORT.md`, `docs/PROJECT-STATUS.md`.
+
+**Release key custody.** `~/.clinnote-signing/` (`clinnote-upload.jks`, `signing.properties`, `upload_certificate.pem`) is the only copy of the key that lets future releases update installed apps. Back it up to two offline locations (e.g. encrypted USB drive and a password manager attachment) — a Codespace is disposable. Never commit it, attach it to a release, put it in CI or serve it from a web/forwarded port. If it is lost, future releases need a new package identity or every user must uninstall (losing local data).
 
 ## 10. Rollback
 

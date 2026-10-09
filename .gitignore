@@ -1,3 +1,43 @@
 # Python bytecode from .claude/hooks
 __pycache__/
 *.pyc
+
+# Secrets and signing material — never commit (SECURITY.md)
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.p8
+key.properties
+signing.properties
+keystore.properties
+*.credentials.json
+service-account*.json
+.clinnote-signing/
+
+# Release artifacts are published on GitHub Releases, never committed
+*.apk
+*.aab
+*.apks
+*.idsig
+SHA256SUMS*.txt
+clinnote-artifacts/
+
+# Recordings and exports
+*.wav
+*.m4a
+*.mp3
+*.aac
+*.ogg
+*.3gp
+*.webm
+
+# Dependencies and build output
+node_modules/
+coverage/
+.DS_Store

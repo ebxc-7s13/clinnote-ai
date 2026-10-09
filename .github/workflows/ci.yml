@@ -1,0 +1,68 @@
+# Minimal CI: typecheck, lint, unit + clinical-safety tests (mock providers, synthetic data) and a secret scan.
+# No API keys, no signing keys, no artifact publication. Releases are built and published manually (docs/DEPLOYMENT.md §9a).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+        env:
+          CI: '1'
+      - run: npm test -- --ci
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      # backend typecheck uses the TypeScript compiler installed in mobile/
+      - run: npm ci
+        working-directory: mobile
+      - run: npm test
+        working-directory: backend
+      - run: npm run typecheck
+        working-directory: backend
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks (full history)
+        run: |
+          curl -sSfL -o gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          tar xzf gl.tgz gitleaks
+          ./gitleaks git --redact --no-banner -v .

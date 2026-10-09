@@ -4,9 +4,9 @@ Single source of truth for current phase and status. Updated from evidence only.
 
 ## Current Phase
 
-V1.1 UPGRADE — continuous consultation, transcript reconciliation, structured clinical report, language registry, liquid-glass UI and in-app reminders (ADR-050 – ADR-053). Updated 2026-10-09 from repository evidence (see `docs/BUILD_REPORT.md`). Development build for synthetic data only; not clinically validated; no regulatory approval.
+PUBLIC GITHUB RELEASE 1.2.0 (ADR-055, 2026-10-09). Google Play is paused; ClinNote is distributed through GitHub Releases under the MIT License. Development-stage software for synthetic data only; not clinically validated; no regulatory approval.
 
-Artifacts: `~/clinnote-artifacts/ClinNote-1.1.0-arm64-v8a-release.apk` (SHA-256 `97cea34a…090401e`) and `ClinNote-1.1.0-release.aab`. Two defects found on the emulator and fixed before release: a data-loss bug when adding a second segment after extraction, and a demo utterance dropped on pause.
+Artifact: `~/clinnote-artifacts/ClinNote-1.2.0-arm64-v8a-release.apk` (44,365,613 bytes, SHA-256 `9291fb3e…90fad3f9a7`), release-signed (certificate SHA-256 `94a47ba6…661d4d99`, not the debug key), `ai.clinnote.app` 1.2.0 / versionCode 3, minSdk 24, targetSdk 36. Publication state (visibility, tag, release URL) is recorded in `docs/BUILD_REPORT.md`.
 
 ## Application Implementation
 
@@ -16,6 +16,7 @@ Artifacts: `~/clinnote-artifacts/ClinNote-1.1.0-arm64-v8a-release.apk` (SHA-256 
 | M2 Speech, Gemini backend, evidence adapters, visit pipeline | TESTED (Gemini live call NOT tested: no key exists) | commit `c652e57`; backend 5/5; live evidence 11/11 (re-run 2026-10-09) |
 | M3 UI screens and end-to-end workflow | TESTED (jest UI); emulator E2E for 1.0.0 | commits `1874258`, `f4efc06` |
 | M4 Tests, audits, Android build, reports | PARTIALLY TESTED (1.0.0 installed by the owner on a phone; owner-reported working) | commits `4eacbe8`, `247d37c`, `84f94aa` |
+| 1.2.0 Public GitHub release (signing, icon, public docs, CI) | TESTED: jest 161/0 (11 live opt-in), backend 5/5, tsc, lint, expo-doctor 21/21, gitleaks full history clean; release APK built and verified; emulator acceptance workflow PASS on the x86_64 twin build; signature-mismatch upgrade from 1.1.0 verified to be refused. **Not tested on a physical device** | ADR-055; `docs/BUILD_REPORT.md` |
 | V1.1 Multi-segment consultation, reconciliation, report, languages, glass UI, reminders | TESTED in jest (domain + UI) and on the Android 14 emulator (full synthetic acceptance workflow, release build); release APK/AAB built; **not yet tested on a physical device** | `consultation.test.ts` 22, `speech.test.ts` +2, `ui.test.tsx` +3; emulator E2E all PASS; ADR-050 – ADR-053 |
 
 ## Status

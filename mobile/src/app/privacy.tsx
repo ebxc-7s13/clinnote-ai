@@ -1,5 +1,7 @@
 /** Screen 19 — Privacy. Plain language; no legal compliance claims. */
 import { router } from 'expo-router';
+import { Linking } from 'react-native';
+import { PROJECT_LINKS } from '../application/links';
 import { Button, Card, Screen, Section, T } from '../presentation/components';
 
 const ITEMS: { title: string; body: string }[] = [
@@ -22,7 +24,8 @@ export default function Privacy() {
           </Card>
         </Section>
       ))}
-      <T variant="small" muted>This summary describes how the app works. It is not a statement of legal compliance. A public privacy policy will be linked here when published.</T>
+      <T variant="small" muted>This summary describes how the app works. It is not a statement of legal compliance. The full privacy policy is published with the source code.</T>
+      <Button kind="secondary" label="Read the full privacy policy" icon="open-in-new" onPress={() => void Linking.openURL(PROJECT_LINKS.privacy).catch(() => undefined)} />
       <Button kind="secondary" label="Open Settings" onPress={() => router.push('/settings')} />
     </Screen>
   );

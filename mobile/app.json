@@ -3,7 +3,7 @@
     "name": "ClinNote",
     "slug": "clinnote",
     "scheme": "clinnote",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -12,9 +12,9 @@
     },
     "android": {
       "package": "ai.clinnote.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -63,7 +63,8 @@
         }
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "./plugins/withReleaseSigning"
     ]
   }
 }
