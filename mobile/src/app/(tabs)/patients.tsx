@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import type { PatientIndexEntry } from '../../domain/types';
 import { formatDate } from '../../domain/util';
-import { Banner, Button, Card, DemoBadge, Empty, Field, Loading, Row, T } from '../../presentation/components';
+import { BottomBar, Banner, Button, Card, DemoBadge, Empty, Field, Loading, Row, T } from '../../presentation/components';
 import { useApp } from '../../presentation/AppContext';
 import { space, useTheme } from '../../presentation/theme';
 
@@ -60,9 +60,9 @@ export default function Patients() {
           </Card>
         )}
       />
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: space.lg, backgroundColor: c.bg }}>
+      <BottomBar inTabs>
         <Button label="New patient" icon="account-plus" onPress={() => router.push('/patient/new')} />
-      </View>
+      </BottomBar>
     </View>
   );
 }

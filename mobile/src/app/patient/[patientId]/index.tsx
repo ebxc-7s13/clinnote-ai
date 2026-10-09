@@ -15,7 +15,7 @@ import { addManualProblem, setProblemStatus } from '../../../domain/problems';
 import { symptomCourse } from '../../../domain/timeline';
 import { formatDate, formatDateTime } from '../../../domain/util';
 import { activeProblems, allergyStatus, currentMedications, pendingFollowUps, proposedForReview } from '../../../domain/views';
-import { Banner, Button, Card, Chip, DemoBadge, Divider, Field, Loading, Row, Section, T } from '../../../presentation/components';
+import { BottomBar, Banner, Button, Card, Chip, DemoBadge, Divider, Field, Loading, Row, Section, T } from '../../../presentation/components';
 import { showError, useApp, usePatient } from '../../../presentation/AppContext';
 import { FactChips } from '../../../presentation/FactRow';
 import { askExport } from '../../../presentation/exportUi';
@@ -239,9 +239,9 @@ export default function PatientOverview() {
           <Button kind="danger" label="Delete patient" icon="delete-outline" onPress={del} />
         </Section>
       </ScrollView>
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: space.lg, backgroundColor: c.bg }}>
+      <BottomBar>
         <Button label={visits.length ? 'Start new visit (returning patient)' : 'Start new visit'} icon="plus-circle-outline" onPress={() => router.push(`/visit/start?patientId=${patient.patientId}`)} />
-      </View>
+      </BottomBar>
     </SafeAreaView>
   );
 }

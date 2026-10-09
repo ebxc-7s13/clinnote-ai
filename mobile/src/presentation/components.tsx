@@ -2,7 +2,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ComponentProps, ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, space, type, useTheme } from './theme';
 
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -201,4 +201,14 @@ export function Loading({ label = 'Loading…' }: { label?: string }) {
 
 export function DemoBadge() {
   return <Chip label="DEMO DATA — NOT A REAL PATIENT" tone="warning" icon="flask-outline" />;
+}
+
+/**
+ * Fixed bottom action area. Adds the bottom safe-area inset so the action is never hidden behind the Android
+ * navigation bar (edge-to-edge). Inside tab screens the tab bar already owns the inset: pass `inTabs`.
+ */
+export function BottomBar({ children, inTabs, gap }: { children: ReactNode; inTabs?: boolean; gap?: number }) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  return <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: space.lg, paddingBottom: space.lg + (inTabs ? 0 : insets.bottom), backgroundColor: c.bg, gap }}>{children}</View>;
 }

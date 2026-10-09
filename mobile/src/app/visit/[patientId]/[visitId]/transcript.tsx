@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { correctSegment, parseTimestamp, segmentIndexAt } from '../../../../domain/transcript';
 import type { SpeakerRole, TranscriptSegment } from '../../../../domain/types';
 import { formatDuration } from '../../../../domain/util';
-import { Banner, Button, Card, Chip, Empty, Field, Loading, Row, Segmented, T } from '../../../../presentation/components';
+import { BottomBar, Banner, Button, Card, Chip, Empty, Field, Loading, Row, Segmented, T } from '../../../../presentation/components';
 import { showError, useApp, useVisit } from '../../../../presentation/AppContext';
 import { radius, space, useTheme } from '../../../../presentation/theme';
 
@@ -177,10 +177,10 @@ export default function Transcript() {
           />
         )}
       />
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: space.lg, backgroundColor: c.bg, gap: space.xs }}>
+      <BottomBar gap={space.xs}>
         {!confirmed && visit.segments.length ? <T variant="small" muted>Confirm the speaker roles to continue.</T> : null}
         <Button label={extracted ? 'Re-run clinical fact extraction' : 'Continue to clinical fact extraction'} icon="text-search" disabled={!confirmed} busy={busy} onPress={() => void extract()} />
-      </View>
+      </BottomBar>
     </SafeAreaView>
   );
 }

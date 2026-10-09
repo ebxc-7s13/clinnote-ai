@@ -44,6 +44,8 @@ export default function Record() {
   const [role, setRole] = useState<SpeakerRole>('UNKNOWN');
   const [finishing, setFinishing] = useState<string | null>(null);
   const [demoRunning, setDemoRunning] = useState(false);
+  /** a synthetic script was used: the microphone was never opened, so never claim it is listening */
+  const [demoUsed, setDemoUsed] = useState(false);
   /** true while this screen drives the microphone or demo script; false after a crash/restart (= interrupted) */
   const [active, setActive] = useState(false);
 
@@ -168,6 +170,7 @@ export default function Record() {
     const all = await app.store.listVisits(patientId);
     const lines = all.filter((x) => x.visitId !== visitId && x.segments.length).length ? DEMO_VISIT_2 : DEMO_VISIT_1;
     setDemoRunning(true);
+    setDemoUsed(true);
     setActive(true);
     clock.current.since = Date.now();
     await setRecording('RECORDING');
@@ -283,7 +286,7 @@ export default function Record() {
           <Text style={{ fontSize: 28, fontWeight: '700', fontVariant: ['tabular-nums'], color: recording ? '#fff' : c.text }}>{formatDuration(elapsed)}</Text>
         </Row>
         <Text style={{ color: recording ? '#fff' : c.textMuted, fontSize: 13 }}>
-          {demoRunning ? 'Synthetic demo script (no microphone)' : `Microphone: ${status === 'LISTENING' ? 'listening' : status === 'RESTARTING' ? 'reconnecting' : status === 'PAUSED' ? 'paused' : status === 'ERROR' ? 'unavailable' : status === 'STOPPED' ? 'off' : 'off'}`}
+          {demoRunning ? 'Synthetic demo script (no microphone)' : demoUsed ? 'Synthetic demo script finished (microphone not used)' : `Microphone: ${status === 'LISTENING' ? 'listening' : status === 'RESTARTING' ? 'reconnecting' : status === 'PAUSED' ? 'paused' : status === 'ERROR' ? 'unavailable' : status === 'STOPPED' ? 'off' : 'off'}`}
           {settings.cloudProcessingEnabled ? (app.backend.configured() && patient.isDemo ? ' · cloud final transcript available' : ' · on-device live transcript only') : ''}
         </Text>
       </View>

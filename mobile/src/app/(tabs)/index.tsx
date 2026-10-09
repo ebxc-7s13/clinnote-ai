@@ -1,12 +1,12 @@
 /** Screen 2 — Home. Start New Visit first in focus order and at the thumb-reachable bottom. */
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { renderFact } from '../../domain/note';
 import { formatDate, formatDateTime } from '../../domain/util';
 import { pendingFollowUps, unreviewedCount } from '../../domain/views';
-import { Banner, Button, Card, Chip, DemoBadge, Empty, Loading, Row, Section, T } from '../../presentation/components';
+import { BottomBar, Banner, Button, Card, Chip, DemoBadge, Empty, Loading, Row, Section, T } from '../../presentation/components';
 import { showError, useApp, useWorkspace } from '../../presentation/AppContext';
 import { visitStatusLine } from '../../presentation/labels';
 import { space, useTheme } from '../../presentation/theme';
@@ -107,9 +107,9 @@ export default function Home() {
           )}
         </Section>
       </ScrollView>
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: space.lg, backgroundColor: c.bg }}>
+      <BottomBar inTabs>
         <Button label="Start new visit" icon="plus-circle-outline" onPress={() => router.push('/visit/start')} accessibilityHint="Choose or create a patient, then start a recorded or manual visit" />
-      </View>
+      </BottomBar>
     </SafeAreaView>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { formatDateTime } from '../../domain/util';
 import { unreviewedCount } from '../../domain/views';
-import { Banner, Button, Card, Chip, Empty, Loading, Row, Segmented, T } from '../../presentation/components';
+import { BottomBar, Banner, Button, Card, Chip, Empty, Loading, Row, Segmented, T } from '../../presentation/components';
 import { useWorkspace } from '../../presentation/AppContext';
 import { visitStatusLine } from '../../presentation/labels';
 import { space, useTheme } from '../../presentation/theme';
@@ -51,9 +51,9 @@ export default function Visits() {
           );
         }}
       />
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: space.lg, backgroundColor: c.bg }}>
+      <BottomBar inTabs>
         <Button label="Start new visit" icon="plus-circle-outline" onPress={() => router.push('/visit/start')} />
-      </View>
+      </BottomBar>
     </View>
   );
 }
