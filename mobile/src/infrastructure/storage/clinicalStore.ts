@@ -112,9 +112,11 @@ export class ClinicalStore {
     return (idx ?? []).sort((a, b) => (b.lastVisitAt ?? b.updatedAt).localeCompare(a.lastVisitAt ?? a.updatedAt));
   }
 
-  private async upsertIndex(p: PatientT, visits?: VisitT[]): Promise<void> {
+  private async upsertIndex(p: PatientT, visits?: VisitT[], touched?: VisitT): Promise<void> {
     const idx = (await this.readDoc(`${ROOT}/index.json.enc`, z.array(PatientIndexEntry))) ?? [];
     const existing = idx.find((e) => e.patientId === p.patientId);
+    // saving one visit can only move lastVisitAt forward; no need to decrypt every visit of the patient
+    if (!visits && touched) visits = [touched, ...(existing?.lastVisitAt ? [{ startedAt: existing.lastVisitAt } as VisitT] : [])];
     const entry: PatientIndexEntryT = {
       patientId: p.patientId,
       patientReference: p.patientReference,
@@ -259,7 +261,7 @@ export class ClinicalStore {
       const checked = Visit.parse(v);
       await this.writeDoc(`${this.pDir(ref)}/visits/${v.visitCode}.json.enc`, checked);
       const p = await this.readDoc(`${this.pDir(ref)}/patient.json.enc`, Patient);
-      if (p) await this.upsertIndex(p, await this.listVisitsUnlocked(ref));
+      if (p) await this.upsertIndex(p, undefined, checked);
     });
   }
 
