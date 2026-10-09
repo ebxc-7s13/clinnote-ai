@@ -178,6 +178,17 @@ ClinNote performs no triage. Content suggesting an emergency is not classified; 
 
 Confirmation sets status CONFIRMED and provenance CLINICIAN_CONFIRMED, keeps the immutable originProvenance, and writes an AuditEvent with the previous values. Only actor CLINICIAN may do this (`DATA_MODEL.md` §6 rule 9). Edits create new fact versions; the old version is never deleted. **Finalizing a note is not a confirmation** of any fact (CS-25).
 
+## 17a. Multi-Segment Consultations, Patient Details and Reports (ADR-050, ADR-051)
+
+- The report and the note use the **complete canonical transcript**, never only the latest segment. Repeated statements are counted, never deleted from the source.
+- A later statement never silently replaces an earlier one. Without an explicit correction cue both stay visible as a conflict; with one, the later value is shown as current *pending clinician confirmation*, and the earlier one stays in the change history.
+- "Denied" then "present" (or the reverse) is a conflict with its chronology; the current state is not computed by concatenation.
+- A medication stated as taken and later as stopped stays in the record with a traceable status change; it is not removed until a clinician confirms the discontinuation.
+- Patient details come only from what was said (questions never ground a value; sex is never inferred). The manual profile is never overwritten by code; differences open PROFILE_MISMATCH conflicts.
+- Non-English utterances are never auto-extracted (English-only negation rules).
+- Medication options to review: label information for medications already mentioned, quoted with its source; information gaps listed. ClinNote never suggests a new medication, a dose or suitability; with no label records it shows INSUFFICIENT VERIFIED EVIDENCE FOR MEDICATION OPTIONS.
+- Saving or exporting a report version confirms nothing; reports and exports are marked DRAFT.
+
 ## 18. Safety Test Matrix
 
 Every row is an automated test (`TESTING.md` §7). All must pass before any phase touching clinical data is marked TESTED.

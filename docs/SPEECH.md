@@ -150,7 +150,17 @@ Fallback switching happens on the backend via routing configuration; the app is 
 
 ## 16. Languages
 
-Supported consultation languages are OPEN DECISION OD-007 (English, regional languages, code-mixed speech). Provider language support must be verified before OD-001 is decided.
+Registry and rules: ADR-052, `mobile/src/domain/languages.ts`. Candidates: English, Telugu, Hindi, Bengali, Tamil, Kannada, Malayalam, plus Auto-detect.
+
+| Path | Language support | Verified |
+|---|---|---|
+| Android SpeechRecognizer (live, all patients) | whatever the device's speech service reports via `getSupportedLocales` (Android 13+); English always offered | per device at runtime; Android ≤ 12 reports nothing → English only |
+| Auto-detect | `EXTRA_ENABLE_LANGUAGE_SWITCH` + allowed languages (API 34), only downloaded languages | developer.android.com RecognizerIntent, 2026-10-09; device behaviour NOT VERIFIED |
+| Cloud final pass (Gemini, synthetic demo only) | English only in V1 | other languages not verified → disabled |
+| Rule-based extraction | English only | negation/hedging cues are English (ADR-050 d11) |
+| Translation | none | no free, verified service |
+
+Each segment and utterance stores its language. Non-English text is kept verbatim and never auto-extracted. Telugu, Hindi and the others are **IMPLEMENTED BUT NOT VERIFIED ON DEVICE**.
 
 ## 17. Clinical Safety
 
@@ -170,3 +180,14 @@ Synthetic audio and synthetic transcripts only. No real patient recordings in th
 ## 19. Model Downloads
 
 None. No Whisper, diarization or VAD models are downloaded.
+
+## 20. Multi-Segment Recording and Duplicate Safety (ADR-050)
+
+- A consultation is one or more recording segments. Pause / Resume / Finish segment / Finalize consultation are separate actions; finishing a segment never finalizes; "Add more conversation" appends a new segment to the same visit.
+- The recognizer runs in restarted chunks (end / silence / timeout). Each final result is one utterance; there is no audio overlap between chunks, so nothing is merged automatically. A sentence split by a restart stays as two utterances, which the clinician can merge on the Transcript screen.
+- **Partial vs final:** on pause the recognizer is stopped and its final result is awaited for 1.5 s; the partial is kept (origin PARTIAL_COMMIT, confidence LOW) only if no final arrives. A final that extends a kept partial replaces it. An identical utterance within 6 s in the same segment is dropped.
+- Four distinct transcript layers: partial (display only), segment transcript (stored utterances of one segment), canonical visit transcript (all segments, ordered, excluded utterances left out), clinician-corrected transcript (same utterances with edits; originals kept in `segmentRevisions`).
+- Recognizer options (verified 2026-10-09, RecognizerIntent reference + expo-speech-recognition 57.1 types): `continuous`, `interimResults`, `addsPunctuation` (EXTRA_ENABLE_FORMATTING, API 33), on-device preference with fallback, and **medical-vocabulary biasing** (`contextualStrings` → EXTRA_BIASING_STRINGS, API 33, English only; ignored by services that do not support it). Android records 16 kHz mono WAV per chunk when temporary audio is captured (demo + backend only).
+- Biasing changes recognition hints only. No transcript text is rewritten afterwards except by the clinician.
+- The cloud final pass replaces only the utterances of its own segment, with time offsets on the visit clock and segment-prefixed speaker labels; it never replaces utterances already cited by a current fact.
+- Replay: not available — temporary audio is deleted after transcription (ADR-014).

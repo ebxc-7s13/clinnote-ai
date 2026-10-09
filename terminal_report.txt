@@ -249,3 +249,29 @@ NEXT ACTION: owner installs the arm64 APK on a phone (synthetic speech only); de
 
 GIT: branch feat/v1-app (eb8af93), fast-forwarded into main and pushed — the result is in the next lines of this entry.
 PUSH (verified): origin main 737c414..c42dc7f (fast-forward of feat/v1-app; main == origin/main). This line is committed in a follow-up docs commit.
+
+===== 2026-10-09T09:21:05Z — ClinNote 1.1.0: continuous consultation, reconciliation, structured report, glass UI =====
+STATUS: COMPLETED (development build, synthetic data only; not clinically validated; no regulatory approval)
+TASK COMPLETED: multi-segment recording (Pause / Resume / Finish segment / Finalize consultation / Add more conversation),
+  whole-visit reconciliation over the canonical transcript, patient-detail extraction with profile conflicts,
+  code-built clinical report (A–S) with versions and PDF/JSON/text export, medication label information
+  (no suggestions; INSUFFICIENT VERIFIED EVIDENCE when absent), language registry gated per device,
+  liquid-glass UI with haptics, workflow tracker, timeline rail and in-app reminders.
+FILES CHANGED: 61 (mobile/src domain, application, app, presentation, tests; app.json/package.json; 10 docs). ADR-050–053.
+COMMANDS RUN: npx tsc --noEmit; CI=1 npx expo lint; npx expo-doctor; npx jest (x2); LIVE_EVIDENCE=1 jest live;
+  backend npm test/typecheck; expo prebuild; gradlew assembleRelease bundleRelease (arm64) and assembleRelease (x86_64);
+  emulator E2E ~/clinnote-e2e/run11.py.
+TESTS RUN / RESULTS: jest 150 passed, 0 failed, 11 skipped (live opt-in); live evidence 11/11; backend 5/5;
+  tsc clean; lint 0; expo-doctor 21/21; emulator acceptance workflow all PASS, 0 crashes, 0 JS/native errors.
+DEFECTS FOUND ON EMULATOR AND FIXED: data loss when adding a segment after extraction (regression test added);
+  demo utterance dropped on pause; translucent bottom bar; tab bar under nav bar; glass elevation artifact.
+ARTIFACTS: ~/clinnote-artifacts/ClinNote-1.1.0-arm64-v8a-release.apk 44,582,689 B
+  SHA-256 97cea34a5a08680b988dcd2b9c6c1b4e5f3197ab9406a8f5c7c7191c8090401e
+  ~/clinnote-artifacts/ClinNote-1.1.0-release.aab 33,786,301 B
+  SHA-256 d2c399490ac2828109bf6c7029eaf499fc614210f7fac63e45910ca380cb0c8c (debug-signed). 1.0.0 artifacts kept.
+RISKS: 1.1.0 not yet on a physical phone; non-English languages IMPLEMENTED BUT NOT VERIFIED ON DEVICE;
+  live microphone, biasing and haptics untested on hardware; extraction English-only.
+BLOCKERS: owner decisions OD-001, OD-002 (+ADR-047), OD-004, OD-006, OD-011, ADR-025 assessment, Play signing.
+NEXT ACTION: owner installs ClinNote-1.1.0-arm64-v8a-release.apk (uninstall 1.0.0 not required; same package,
+  higher versionCode, same debug key) and tests live microphone, pause/resume, add-more and a non-English language.
+COMMITS: 49ddfc8 (feat: domain/services/tests), 3ff318b (feat: UI 1.1.0), docs commit — see below.

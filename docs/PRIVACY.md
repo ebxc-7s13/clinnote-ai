@@ -73,6 +73,15 @@ Third-party provider table (completed in BUILD_PLAN Phase 20 before production):
 | Supabase Auth (ADR-032) | clinician email and auth tokens (no patient data) | clinician sign-in, abuse control | VERIFY | VERIFY | privacy policy + Data Safety | VERIFY |
 | Crash reporting | none: no SDK in V1 (ADR-030); Google Play Android vitals only | stability | Google | per Play terms (VERIFY) | privacy policy | Play developer terms |
 
+## 7a. V1.1 Additions (ADR-050 – ADR-053)
+
+- Patient profile `occupation` and `preferredLanguage` are optional, stored only on the device, never sent.
+- Patient details stated in conversation (DEMOGRAPHIC facts) are never used in evidence queries and are excluded from the R2 job input.
+- No translation service is used; non-English transcripts never leave the device except through the existing synthetic-only cloud path (English only in V1).
+- Reminders are computed on the device; no notifications, no notification permission.
+- The JSON report export contains the visit's source data (profile fields, transcript, facts); it carries the export warning, a DRAFT label and an audit event like every export.
+- New libraries (`expo-linear-gradient`, `expo-haptics`) collect no data and add no permission.
+
 ## 8. Analytics
 
 V1 ships with no product analytics. If analytics are added later (ADR required), they must never include transcript, patient identifiers, medications, symptoms, diagnoses, notes, audio or evidence queries.

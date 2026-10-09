@@ -60,6 +60,14 @@ Avoid: excessive gradients, neon, 3D graphics, distracting animation, gamificati
 - **Empty states:** explain the screen and offer the primary action.
 - **Synthetic data only** in screenshots and store assets.
 
+## 2a. Liquid Glass (ADR-053)
+
+- Every screen sits on a soft gradient with slow colour fields (static when reduce-motion is on). Cards, bars and inputs are translucent glass (≥ 0.62 opacity light / 0.62 dark) with a light top sheen and a hairline highlight border, so text keeps AA contrast.
+- Buttons: gradient (primary, record, danger, success) or glass (secondary); spring scale on press, light haptic; disabled = 45 % opacity and announced. Sections can be expandable (header button announces expanded state).
+- Trackers: the visit hub shows a vertical step tracker (consent → recording segments → transcript → reconcile/facts → medications → evidence → report → review → note → compare); the timeline uses a vertical rail; Home shows stat tiles and reminders.
+- Recording screen: hero card with state label + pulse, total and segment time, visit start, microphone status, language, last-saved time; a strip of recording segments; actions offered per state only (RECORDING: Pause + Finish segment; PAUSED: Resume + Finish segment; SEGMENT_COMPLETE: Review new transcript, Reconcile complete visit, Continue conversation, Finalize consultation; FINALIZED: Add more conversation); double presses are ignored.
+- Report screen: expandable sections (patient, visit, summary, symptoms, history, medications, allergies, vitals, examination, investigations, clinical topics, medication information, assessment, plan, follow-up, comparison, unresolved items, citations, confirmation); tables are stacked cards (no horizontal scrolling); every row opens its fact.
+
 ## 3. Screens
 
 Each of the 21 screens is specified with the same nine attributes. Screen 21 (Visits) was added in Stage A; the Visits tab previously had no specification.

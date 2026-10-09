@@ -779,6 +779,51 @@ Note: ADR numbering was reorganized on 2026-10-08 during the documentation corre
   8. **Reference images:** none are shown (no source with a verified reuse license; OD-008).
 - **Consequences:** UI-UX Screen 16 (Returning Patient) is part of the Patient Overview. Note type is chosen in the Note Editor rather than on Start Visit. Clinician sign-in (FR-28.4) is not implemented: the backend uses the public anon key and OD-004 is open.
 
+## ADR-050 — Multi-Segment Consultations and Whole-Visit Reconciliation
+
+- **Status:** ACCEPTED (2026-10-09; owner request "transcription intelligence, continuous consultation" upgrade). Recorded with the implementation in the same change set.
+- **Context:** One visit had one implicit recording. Stopping meant the end of the transcript, so a clinician could not add conversation after extraction without a new visit; the cloud final pass replaced the whole transcript.
+- **Decision:**
+  1. A visit holds one or more **recording segments** (`RecordingSegment`, SEG-0001 …) with start/end, pauses, language, provider and a clock offset. Utterances (`TranscriptSegment`) carry `recordingSegmentId`, `language`, `addedAt` and `origin`.
+  2. **Pause, Resume, Finish segment and Finalize consultation are distinct actions** (state machine in `domain/consultation.ts`). Finishing a segment never finalizes. Finalizing confirms nothing (CS-25). "Add more conversation" reopens a finalized consultation (audited) and appends a new segment; earlier segments, facts and notes are untouched until the clinician reconciles.
+  3. Every transcript change increments `transcriptVersion` and keeps the old text in `segmentRevisions`. Split, merge (merged-away utterance kept, excluded) and exclude-duplicate (kept, restorable) are clinician actions. Facts citing a changed utterance return to review (SOURCE_CHANGED, unchanged rule).
+  4. **Reconciliation** = extraction over the **canonical transcript** (all non-excluded utterances, ordered by segment, clock time, insertion; deterministic, no duplicates), then conflict detection, profile reconciliation and repetition marks. Confirmed and manual facts are kept (unchanged rule). `reconciledTranscriptVersion` shows when the transcript changed since.
+  5. Duplicate-safe capture: an identical utterance within 6 s in the same segment is dropped; a kept partial followed by its final is replaced, not appended. The cloud final pass replaces only the utterances of its own segment, and never utterances already cited by a current fact.
+  6. **Patient details** stated in conversation become `DEMOGRAPHIC` facts (age, occupation, education/class, language, name) — self-reports from the PATIENT role, statements to the patient from the DOCTOR role, never from questions, never inferred (no sex from pronouns). They are never searched and never sent to the R2 job.
+  7. **Profile precedence:** the manually entered profile is the record. A differing statement opens a `PROFILE_MISMATCH` FactConflict (same conflict model, ADR-022) with `profileField`/`profileValue`; code never overwrites the profile. Only an explicit clinician action copies the stated value into the profile (audited).
+  8. **Medication status:** a CURRENT statement and a PREVIOUS/DISCONTINUED statement for the same medication open a conflict (within or across visits). Nothing is removed.
+  9. **Explicit correction:** a later statement with a correction cue ("actually", "sorry", "I mean" …) sets `explicitCorrection` on the conflict. The report then shows the later value as current *pending clinician confirmation*, the earlier one in the change history. Without a cue both stay visible as a conflict.
+  10. Time policy: stored timestamps are UTC ISO-8601; the UI shows device local time; `Visit.startedAt` is the encounter time and is never reset.
+  11. Automatic extraction runs on English utterances only; other languages are kept verbatim and flagged for manual review (negation/hedging rules are English-only; a Hinglish "fever nahi hai" must never become fever present).
+- **Consequences:** Visit schema v2 (v1 documents migrate on read: one SEG-0001 covering all utterances). Tests: `consultation.test.ts`, UI recording test.
+
+## ADR-051 — Structured Clinical Encounter Report, Versions and JSON Export
+
+- **Status:** ACCEPTED (2026-10-09)
+- **Decision:**
+  1. `domain/report.ts` builds the report (sections A–S of the owner template) **by code** from eligible facts, the manual profile, conflicts, retrieved evidence and earlier visits (ADR-043). No model prose. Missing data is reported as missing; completeness per domain is PRESENT / NOT_DISCUSSED / UNKNOWN / CONFLICTED / NOT_APPLICABLE.
+  2. Medications are grouped CURRENT / PREVIOUS / REPORTED STOPPED / PROPOSED CHANGE (clinician plan wording) / UNCERTAIN / ON RECORD NOT DISCUSSED. A mention is never treated as an active prescription. Allergies distinguish documented-none, denied, not discussed and uncertain.
+  3. Report versions (`Visit.reportVersions`) keep the structured JSON, transcript version, extraction providers, clinician-edit/confirmed counts and open conflicts. Saving or exporting confirms nothing.
+  4. Export: PDF/text render the JSON; the **JSON export** separates `source` (profile, recording segments, canonical and excluded transcript, revisions, facts, conflicts, note versions) from `derived` (report). Possibilities never enter exports (CS-32).
+  5. **Medication options to review** are limited to label information for medications already mentioned (indications as stated, boxed warning, contraindications, warnings, drug-interaction section — quoted, with source and retrieval time) plus information gaps. ClinNote never proposes a new medication, a dose or suitability (R3 prohibited, ADR-025). Without label records it shows **INSUFFICIENT VERIFIED EVIDENCE FOR MEDICATION OPTIONS**. RxNav's interaction API is not used.
+  6. Evidence: concepts are ranked (confirmed, then mention count, then presenting complaint); a concept signature marks evidence outdated when the clinical context changes materially.
+
+## ADR-052 — Consultation Language Registry (OD-007 owner direction)
+
+- **Status:** ACCEPTED for V1 (2026-10-09). The owner named English, Telugu, Hindi, Bengali, Tamil, Kannada and Malayalam as candidate languages.
+- **Decision:**
+  1. `domain/languages.ts` is the single registry (code, names, provider/live/final/diarization/translation/extraction support, status). The UI never hard-codes availability.
+  2. A language is selectable only when the Android speech service on the device reports it (`getSupportedLocales`; Android 13+). If the device cannot report locales, only English is selectable, with the reason shown. Auto-detect needs Android 14+ (EXTRA_ENABLE_LANGUAGE_SWITCH, verified) and at least two downloaded languages; it is labelled experimental.
+  3. Each segment and utterance stores its language; the original text is never translated in place. No translation service is used (none free and verified); the cloud final pass is enabled for English only (other languages not verified).
+  4. Automatic fact extraction is English-only (ADR-050 d11).
+- **Consequences:** Non-English consultations are transcribed (where the device supports them) and documented manually. Telugu/Hindi etc. are **IMPLEMENTED BUT NOT VERIFIED ON DEVICE**.
+
+## ADR-053 — Liquid-Glass Visual Design and In-App Reminders
+
+- **Status:** ACCEPTED (2026-10-09; owner request)
+- **Decision:** Translucent glass surfaces over a soft gradient with slow colour fields (respecting reduce-motion), spring press feedback and light haptics. New free Expo SDK libraries: `expo-linear-gradient`, `expo-haptics` (no new permission; VIBRATE was already merged). No blur library (Android blur needs a target-view API and costs list performance). Reminders are computed in-app from local records (overdue/soon follow-ups from stated intervals, interrupted recordings, reconciliation needed, open conflicts, unreviewed facts, unfinalized notes and consultations). **No system notifications and no notification permission** (ADR-049 d3 unchanged).
+- **Consequences:** Contrast stays AA on glass (text sits on ≥ 0.62-opacity surfaces). Reminders need the app to be opened.
+
 ---
 
 # Open Decisions
@@ -835,7 +880,7 @@ Statuses: **OPEN** (needs external information, evaluation or a professional/own
 
 ## OD-007 — Supported Consultation Languages
 
-- **Status:** OPEN
+- **Status:** PARTIALLY RESOLVED (2026-10-09, ADR-052): owner named the candidate languages; availability is decided per device at runtime; extraction stays English-only. Open: production speech provider language quality (OD-001).
 - **Why open:** Target clinicians may consult in English, a regional language or code-mixed speech. This is a product and market decision for the owner, and provider support must be verified.
 - **Planning default:** Phases 1–7 are language-independent. The Phase 8 provider evaluation assumes English unless the owner says otherwise.
 - **Who decides:** Project owner.

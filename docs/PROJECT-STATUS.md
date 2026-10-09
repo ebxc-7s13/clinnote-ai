@@ -4,25 +4,26 @@ Single source of truth for current phase and status. Updated from evidence only.
 
 ## Current Phase
 
-V1 APPLICATION BUILD — M3 (UI + end-to-end workflow) and M4 (tests, audits, Android build). Branch `feat/v1-app`. Updated 2026-10-09 from repository evidence (see `docs/BUILD_REPORT.md`).
+V1.1 UPGRADE — continuous consultation, transcript reconciliation, structured clinical report, language registry, liquid-glass UI and in-app reminders (ADR-050 – ADR-053). Updated 2026-10-09 from repository evidence (see `docs/BUILD_REPORT.md`). Development build for synthetic data only; not clinically validated; no regulatory approval.
+
+Artifacts: `~/clinnote-artifacts/ClinNote-1.1.0-arm64-v8a-release.apk` (SHA-256 `97cea34a…090401e`) and `ClinNote-1.1.0-release.aab`. Two defects found on the emulator and fixed before release: a data-loss bug when adding a second segment after extraction, and a demo utterance dropped on pause.
 
 ## Application Implementation
-
-IMPLEMENTED (M1 domain + encrypted storage + safety engine; M2 providers; M3 all screens and workflow; M4 test suite and audits). This is a development build for synthetic data only. It is not clinically validated and has no regulatory approval.
 
 | Milestone | Status | Evidence |
 |---|---|---|
 | M1 Domain, encrypted JSON storage, deterministic safety engine | TESTED | commit `72d96d9`; jest safety + storage suites |
-| M2 Speech, Gemini backend, evidence adapters, visit pipeline | TESTED (Gemini live call NOT tested: no key exists) | commit `c652e57`; backend 5/5; 9 public evidence APIs live-verified 2026-10-09 (2 adapter bugs fixed) |
-| M3 UI screens and end-to-end workflow | TESTED (jest UI tests); NOT tested on a device | commits `1874258`, `f4efc06`; 25 routes; UI flow test consent → record → transcript → extraction → note → finalize |
-| M4 Tests, audits, Android build, reports | PARTIALLY TESTED: release APK + AAB built (debug-signed); full synthetic workflow passed on an Android 14 emulator; no physical device, live microphone or Play signing | commits `4eacbe8`, `247d37c`, `84f94aa`; BUILD_REPORT |
+| M2 Speech, Gemini backend, evidence adapters, visit pipeline | TESTED (Gemini live call NOT tested: no key exists) | commit `c652e57`; backend 5/5; live evidence 11/11 (re-run 2026-10-09) |
+| M3 UI screens and end-to-end workflow | TESTED (jest UI); emulator E2E for 1.0.0 | commits `1874258`, `f4efc06` |
+| M4 Tests, audits, Android build, reports | PARTIALLY TESTED (1.0.0 installed by the owner on a phone; owner-reported working) | commits `4eacbe8`, `247d37c`, `84f94aa` |
+| V1.1 Multi-segment consultation, reconciliation, report, languages, glass UI, reminders | TESTED in jest (domain + UI) and on the Android 14 emulator (full synthetic acceptance workflow, release build); release APK/AAB built; **not yet tested on a physical device** | `consultation.test.ts` 22, `speech.test.ts` +2, `ui.test.tsx` +3; emulator E2E all PASS; ADR-050 – ADR-053 |
 
 ## Status
 
-- Tests (2026-10-09): mobile 123 passed / 0 failed (11 live tests opt-in, skipped in CI; live run 11/11); backend 5/5; `tsc` clean; `expo lint` 0 problems; `expo-doctor` 21/21; emulator E2E all PASS.
-- Privacy gate ADR-047: free-tier Gemini is used only for synthetic demo visits (free-tier content may be used to improve Google's products).
-- Decisions recorded retrospectively: ADR-046 (encrypted JSON store, supersedes ADR-013), ADR-048 (provisional free-only providers). ADR-049 records the M3 choices.
-- Production use is BLOCKED by owner decisions: OD-001, OD-002 (+ the free-only vs. data-terms conflict, ADR-047), OD-004, OD-006, OD-011, the ADR-025 regulatory assessment, Play account and signing.
+- Tests (2026-10-09): mobile **150 passed / 0 failed** (11 live tests opt-in; live run 11/11); backend 5/5; `tsc` clean; `expo lint` 0 problems; `expo-doctor` 21/21.
+- Languages: English working path unchanged; Telugu, Hindi, Bengali, Tamil, Kannada, Malayalam and Auto-detect are runtime-gated by the device speech service — **IMPLEMENTED BUT NOT VERIFIED ON DEVICE**. Automatic fact extraction remains English-only.
+- Privacy gate ADR-047 unchanged: free-tier Gemini only for synthetic demo visits. FREE_ONLY_MODE unchanged; no new paid service; no new permission.
+- Production use is BLOCKED by owner decisions: OD-001, OD-002 (+ free-only vs. data terms, ADR-047), OD-004, OD-006, OD-011, the ADR-025 regulatory assessment, Play account and signing.
 
 ## Phase Table
 
@@ -35,7 +36,7 @@ IMPLEMENTED (M1 domain + encrypted storage + safety engine; M2 providers; M3 all
 | 4 | Local Database (encrypted JSON, ADR-046) | TESTED |
 | 5 | Patient System | TESTED |
 | 6 | Visit System (+ safety test corpus) | TESTED |
-| 7 | Recording (+ 7B backend foundation) | PARTIALLY_TESTED (mocked recognizer; backend not deployed) |
+| 7 | Recording (+ 7B backend foundation) | PARTIALLY_TESTED (multi-segment recording jest-tested; mocked recognizer; backend not deployed) |
 | 8 | Speech | PARTIALLY_TESTED (Android recognizer mocked; Gemini transcription not live-tested) |
 | 9 | Speaker Diarization | PARTIALLY_TESTED (live tagging + clinician mapping tested; Gemini diarization mocked) |
 | 10 | Clinical Extraction | TESTED (rule-based); AI path tested with mocks only |
@@ -43,7 +44,7 @@ IMPLEMENTED (M1 domain + encrypted storage + safety engine; M2 providers; M3 all
 | 12 | Evidence Engine | TESTED (9 public sources live) |
 | 13 | AI Reasoning (R2 possibilities) | IMPLEMENTED behind default-off dev flag; mock-tested; release BLOCKED (ADR-025) |
 | 14 | Clinical Review | TESTED |
-| 15 | Note Generation | TESTED |
+| 15 | Note Generation (+ structured report, ADR-051) | TESTED |
 | 16 | Longitudinal Memory | TESTED |
 | 17 | Follow-Up | PARTIALLY_TESTED |
 | 18 | Export | PARTIALLY_TESTED (rendering/audit tested; PDF + share sheet need a device) |

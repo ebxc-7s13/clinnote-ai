@@ -150,7 +150,9 @@ DOCTOR · PATIENT · OTHER · UNKNOWN. DOCTOR denotes the clinician role regardl
 
 ### 3.6 FactCategory
 
-SYMPTOM · HISTORY_MEDICAL · HISTORY_SURGICAL · HISTORY_FAMILY · HISTORY_SOCIAL · MEDICATION · ALLERGY · VITAL_SIGN · EXAMINATION_FINDING · INVESTIGATION · ASSESSMENT · PLAN · FOLLOW_UP · OTHER
+SYMPTOM · HISTORY_MEDICAL · HISTORY_SURGICAL · HISTORY_FAMILY · HISTORY_SOCIAL · MEDICATION · ALLERGY · VITAL_SIGN · EXAMINATION_FINDING · INVESTIGATION · ASSESSMENT · PLAN · FOLLOW_UP · DEMOGRAPHIC · OTHER
+
+DEMOGRAPHIC (ADR-050): patient details stated in the consultation. Attributes `demographicKind` (NAME / AGE / DATE_OF_BIRTH / SEX / OCCUPATION / EDUCATION / LANGUAGE), `demographicValue` (the stated detail, a verbatim sub-span), `demographicQualifier` (CURRENT / PREVIOUS). conceptKey `demographic:<kind>`. Never searched, never sent to the R2 job, excluded from timeline and visit comparison. Never inferred (no sex from pronouns, no occupation from context).
 
 ### 3.7 EvidenceSourceType
 
@@ -237,7 +239,26 @@ Fields for each entity. Types are logical; physical column types are set in Phas
 | rawConfidence | number | optional |
 | isFinal | boolean | live vs final |
 | editedByClinician | boolean | |
-| sourceProvider | string | adapter ID |
+| sourceProvider | string | adapter ID; `clinician-typed` for manual utterances |
+| recordingSegmentId | UUID | v2: recording segment (§4.4a) |
+| language | BCP-47 | v2: language recognised or selected; text is never translated in place |
+| addedAt | timestamp | v2: when the utterance was appended |
+| origin | LIVE / PARTIAL_COMMIT / FINAL / MANUAL / SPLIT / DEMO | v2 |
+| clinicianMarkedUncertain | boolean | v2: extraction flags facts from it UNCERTAIN_SPEECH |
+| excluded | { reason DUPLICATE / MERGED / ACCIDENTAL, at, mergedIntoSegmentId } | v2: left out of the canonical transcript; text kept as evidence |
+| possibleRepeatOf | UUID | v2: display hint from reconciliation; nothing is deleted |
+
+### 4.4a RecordingSegment, transcript versions and the canonical transcript (ADR-050)
+
+A visit holds 1…n recording segments. Fields: recordingSegmentId, displayCode (`SEG-0001`), index, startedAt, endedAt, status (RECORDING / PAUSED / COMPLETED), transcriptionStatus (IN_PROGRESS / COMPLETED / PARTIAL / FAILED / EMPTY), language, provider, clockOffsetSec (visit recording clock at start), durationSec (pauses excluded), pauses [{pausedAt, resumedAt}], createdAt.
+
+Visit v2 fields: `recordingSegments`, `consultationState` (OPEN / FINALIZED), `consultationFinalizedAt`, `transcriptVersion` (incremented on every append or change), `reconciledTranscriptVersion` (version the current facts were extracted from), `lastReconciledAt`, `segmentRevisions` [{segmentId, action, previousText, previousRole, transcriptVersion, at}], `reportVersions` (§4.25), `evidenceConceptSignature`.
+
+**Canonical transcript:** all non-excluded utterances ordered by recording segment index, then clock time, then insertion order. Deterministic; contains no utterance twice. Extraction and reconciliation read it; only English utterances are auto-extracted (ADR-050 d11).
+
+**Time policy:** timestamps are stored as UTC ISO-8601 and shown in device local time. `Visit.startedAt` is the encounter start and is never reset; `endedAt` follows the latest segment end; utterance `startTime`/`endTime` are seconds on the visit recording clock.
+
+**Migration v1 → v2 (on read):** an ambient v1 visit gets one SEG-0001 covering all utterances (startedAt = visit start, durationSec = recordingDurationSec); an interrupted v1 recording becomes a PAUSED segment. Nothing else changes.
 
 ### 4.5 ClinicalFact
 
@@ -403,7 +424,9 @@ Never stores prompts, transcript text, responses or query text.
 | conflictId | UUID | |
 | patientId, visitId | UUID | visit in which the conflict was detected |
 | factIds | UUID[] | ≥2 facts with the same `category` + `conceptKey` (or a blanket `ANY` fact and a specific fact) |
-| conflictType | SELF_CORRECTION / SPEAKER_DISAGREEMENT / BLANKET_VS_SPECIFIC / VALUE_MISMATCH / CROSS_VISIT | §9 |
+| conflictType | SELF_CORRECTION / SPEAKER_DISAGREEMENT / BLANKET_VS_SPECIFIC / VALUE_MISMATCH / CROSS_VISIT / PROFILE_MISMATCH | §9. PROFILE_MISMATCH (ADR-050): one DEMOGRAPHIC fact differs from the manual profile |
+| profileField, profileValue | string | PROFILE_MISMATCH only: profile field (name / age / occupation / preferredLanguage) and its recorded value. The profile is changed only by an explicit clinician action |
+| explicitCorrection | boolean | set by code when the later statement has a correction cue; the report shows it as current pending confirmation |
 | detectedBy | DETERMINISTIC_RULE / AI_JOB | AI_JOB = flagged by job 2 as a correction; always re-checked by the deterministic detector |
 | status | OPEN / RESOLVED_BY_CLINICIAN / DISMISSED_BY_CLINICIAN | |
 | proposedCurrentFactId | UUID | system proposal (usually the later statement); **not authoritative** |
@@ -423,6 +446,14 @@ proposalId, patientId, visitId, targetType (PROBLEM / MEDICATION / ALLERGY / HIS
 
 Proposals are produced by AI job 10 and by deterministic rules. They never change the profile until the clinician accepts them. On acceptance the target record is created or updated with provenance CLINICIAN_CONFIRMED.
 
+### 4.24a Patient profile additions (v2)
+
+`occupation`, `preferredLanguage` (registry code) — optional, manual, on device only, never sent.
+
+### 4.25 ReportVersion (ADR-051)
+
+versionId, versionNumber, generatedAt, transcriptVersion, generator (`clinnote-report@1`), extractionProviders, clinicianEditedFactCount, confirmedFactCount, currentFactCount, unresolvedConflictCount, report (structured JSON built by code, `domain/report.ts`). Previous versions are kept. Generating a version confirms nothing.
+
 ### 4.24 AppSettings (local, non-clinical)
 
 onboardingAcknowledgedAt, onboardingVersion, processingDisclosureShownAt, cloudProcessingEnabled (boolean, default false until onboarding acknowledged), defaultNoteType, appLockEnabled.
@@ -441,6 +472,8 @@ RECORDING|PAUSED --stop--> STOPPED
 RECORDING|PAUSED --error--> FAILED
 RECORDING|PAUSED --consent withdrawn--> STOPPED (consentState=WITHDRAWN)
 ```
+
+v2 (ADR-050): the transitions apply **per recording segment**; `Visit.recordingState` mirrors the active segment. Finishing a segment (STOPPED) leaves the consultation OPEN. `OPEN --finalize [no active segment]--> FINALIZED`; `FINALIZED --add more conversation--> OPEN` (audited, new segment). UI phases (IDLE, REQUESTING_PERMISSION, RECORDING, PAUSED, PROCESSING_SEGMENT, SEGMENT_COMPLETE, CONSULTATION_OPEN, FINALIZING, FINALIZED, ERROR, RECOVERABLE) and the actions each offers are defined in `domain/consultation.ts` (`PHASE_ACTIONS`).
 
 ### 5.2 Pipeline Stages (canonical order, ADR-023, ADR-034)
 

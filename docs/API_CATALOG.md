@@ -642,6 +642,9 @@ These must never contain real values in Git. `.env.example` lists names only.
 | MedlinePlus Web Service (wsearch.nlm.nih.gov/ws/query) | 2026-10-09 | live call | keyless; 2 topics, medlineplus.gov URLs only, attribution kept | live.test.ts |
 | ClinicalTrials.gov API v2 (clinicaltrials.gov/api/v2) | 2026-10-09 | live call | keyless; 5 NCT ids (NCT\d{8}) with study URLs; clinician-request only | live.test.ts |
 | PubChem PUG REST (pubchem.ncbi.nlm.nih.gov/rest/pug) | 2026-10-09 | live call | keyless; metformin → CID 4091; clinician-request only | live.test.ts |
+| Android RecognizerIntent (developer.android.com/reference/android/speech/RecognizerIntent) | 2026-10-09 | official reference page | EXTRA_BIASING_STRINGS and EXTRA_ENABLE_FORMATTING added in API 33; EXTRA_ENABLE_LANGUAGE_DETECTION, EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, EXTRA_ENABLE_LANGUAGE_SWITCH added in API 34; switching requires downloaded language models | V1.1 session (lead) |
+| expo-speech-recognition 57.1 (package type docs) | 2026-10-09 | `node_modules/expo-speech-recognition/build/*.d.ts` | `contextualStrings` → EXTRA_BIASING_STRINGS; `getSupportedLocales()` returns empty on Android ≤ 12; `languagedetection` event with `detectedLanguage`; Android recording default 16 kHz | V1.1 session |
+| openFDA drug label fields | 2026-10-09 | live call `drug/label.json?search=openfda.generic_name:metformin` | `drug_interactions`, `indications_and_usage`, `contraindications`, `warnings_and_cautions`, `boxed_warning` present; disclaimer "Do not rely on openFDA to make decisions regarding medical care"; terms https://open.fda.gov/terms/ | V1.1 session; live suite 11/11 |
 | NLM Clinical Tables (clinicaltables.nlm.nih.gov) | 2026-10-09 | live call | keyless; 6 condition suggestions for "diab" | live.test.ts |
 
 Add one row per verification. Re-verify all providers in Phase 25.

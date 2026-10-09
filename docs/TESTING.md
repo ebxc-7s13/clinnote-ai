@@ -205,6 +205,12 @@ The mapping to CS IDs is in `CLINICAL-SAFETY.md` §18.
 - with the flag OFF, jobs 12–13 are never called (CS-37)
 - note drafting never waits on or consumes the candidate stage (CS-32)
 
+## 13b. V1.1 Consultation and Report Tests (ADR-050 – ADR-053)
+
+`mobile/src/__tests__/consultation.test.ts` (synthetic only): pause/resume without duplicates (E), kept partial replaced by its final, add more conversation after finalize (D), state machine actions, UTC segment timestamps, encrypted save/reload, duration correction with and without an explicit cue (A), fever denied then present (B), medication taken then stopped (C), profile age 45 vs stated 47, the owner's full report-accuracy transcript (name, age, occupation, cough three weeks, worse at night, ~3 kg weight loss, fever denied, current vs stopped medication, plan, follow-up), JSON export structure, confirm vs save, split/merge/exclude/restore/uncertain/manual utterances, v1→v2 migration, language availability gating, non-English never auto-extracted, follow-up due dates, reminders. `speech.test.ts`: pause keeps one final; partial kept only without a final; biasing and language passed. `ui.test.tsx`: recording phases and buttons per state, two segments + finalize + add more, report screen sections and save.
+
+Multilingual: registry behaviour is unit-tested with simulated device locale lists. Recognition in Telugu, Hindi, Bengali, Tamil, Kannada and Malayalam is **IMPLEMENTED BUT NOT VERIFIED ON DEVICE**.
+
 ## 14. Documentation Tests
 
 During documentation phases: all required files exist at exact paths; none empty; each has a title; no unfinished-text markers (to-do markers, filler text); every `ADR-`/`OD-` reference resolves in `DECISIONS.md`; no secret-like strings; no regulatory-approval claims except as prohibitions.
