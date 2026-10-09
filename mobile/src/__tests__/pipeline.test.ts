@@ -166,6 +166,17 @@ describe('evidence adapters with fixtures (no network)', () => {
     await expect(openfdaLabel(['861007'])).rejects.toBeInstanceOf(ProviderError);
   });
 
+  test('openFDA product lists are ORed explicitly (a "+" joiner becomes %2B and matches nothing)', async () => {
+    const urls: string[] = [];
+    setFetch(async (url: string) => {
+      urls.push(url);
+      return { status: 404, ok: false, text: async () => '{"error":{"code":"NOT_FOUND"}}' };
+    });
+    await openfdaLabel(['6809', '861007']);
+    expect(decodeURIComponent(urls[0])).toContain('openfda.rxcui:("6809" OR "861007")');
+    expect(urls[0]).not.toContain('%2B');
+  });
+
   test('CS-11: several RxNorm candidates → no automatic choice', async () => {
     respond({
       'rxcui.json': { body: JSON.stringify({ idGroup: {} }) },

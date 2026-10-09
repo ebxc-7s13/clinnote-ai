@@ -129,7 +129,8 @@ export default function Record() {
       setStatusMsg('Microphone permission was denied. Nothing was recorded. Allow microphone access in Android settings, or continue manually.');
       return;
     }
-    const captureAudio = settings.cloudProcessingEnabled && app.backend.configured();
+    // temporary audio is only kept when it can be used: backend AI is for synthetic demo visits only (ADR-047)
+    const captureAudio = settings.cloudProcessingEnabled && app.backend.configured() && !!patient?.isDemo;
     ctrl.current = new LiveSpeechController(
       {
         onFinal: (text, conf) => addSegment(text, conf),
@@ -283,7 +284,7 @@ export default function Record() {
         </Row>
         <Text style={{ color: recording ? '#fff' : c.textMuted, fontSize: 13 }}>
           {demoRunning ? 'Synthetic demo script (no microphone)' : `Microphone: ${status === 'LISTENING' ? 'listening' : status === 'RESTARTING' ? 'reconnecting' : status === 'PAUSED' ? 'paused' : status === 'ERROR' ? 'unavailable' : status === 'STOPPED' ? 'off' : 'off'}`}
-          {settings.cloudProcessingEnabled ? (app.backend.configured() ? ' · cloud final transcript available' : ' · on-device live transcript only') : ''}
+          {settings.cloudProcessingEnabled ? (app.backend.configured() && patient.isDemo ? ' · cloud final transcript available' : ' · on-device live transcript only') : ''}
         </Text>
       </View>
       <View style={{ paddingHorizontal: space.lg, gap: space.sm }}>

@@ -118,7 +118,7 @@ Note: ADR numbering was reorganized on 2026-10-08 during the documentation corre
 
 ## ADR-013 — SQLite as Local Clinical Store
 
-- **Status:** ACCEPTED
+- **Status:** SUPERSEDED by ADR-046 (2026-10-09)
 - **Context:** Relational data, offline search.
 - **Decision:** SQLite via the current Expo SQLite library.
 - **Reason:** Mature, relational, offline.
@@ -731,6 +731,53 @@ Note: ADR numbering was reorganized on 2026-10-08 during the documentation corre
   - CLINICAL-SAFETY CS-04 D, CS-24 B and CS-46 (keep-and-flag)
   - BUILD_PLAN Phases 10, 15 and 16
 - **Future review condition:** OD-012.
+
+---
+
+## ADR-046 — Encrypted JSON Documents as the Local Clinical Store (supersedes ADR-013)
+
+- **Status:** ACCEPTED (implemented 2026-10-08 in commit `72d96d9`; recorded retrospectively 2026-10-09, M3/M4 session — the implementation preceded this record, which violated the documentation-first rule; corrected here)
+- **Context:** ADR-013 chose SQLite, with encryption depending on library support (OD-003). The visit is the unit of work and is always read and written whole; search is small-scale and local.
+- **Decision:** One AES-256-GCM-encrypted JSON document per patient and per visit (`data/patients/<P-xxxxxx>/…`), plus encrypted settings, a derived patient index and the public-evidence cache. The 256-bit data key lives in Android Keystore-backed secure storage (expo-secure-store). Writes are atomic (temp file, verify, replace) and serialized. Every document is schema-validated with zod on read and write.
+- **Reason:** Encryption without a native SQLCipher dependency (resolves OD-003 for V1). Whole-visit atomic writes match the per-stage persistence rule (CLAUDE.md §11). The schema stays canonical in `src/domain/types.ts`.
+- **Consequences:** Search scans decrypted documents in memory (fine for a single clinician's device; revisit at scale). "Delete all local data" removes the files and destroys the key. `allowBackup` is false.
+- **Future review condition:** More than ~1,000 visits per device, or cross-patient queries that need indexes.
+
+## ADR-047 — Free-Tier Cloud AI Is Used for Synthetic Demo Visits Only
+
+- **Status:** ACCEPTED (2026-10-09). Engineering privacy gate under the safety restriction principle (ADR-018); not a legal conclusion.
+- **Context:** The project owner requires every runtime service to be free, with no paid fallback. The Gemini API free tier was verified on 2026-10-09 (https://ai.google.dev/gemini-api/docs/pricing). All allowlisted backend models (`gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3.5-transcribe`) are "Free of charge", **but free-tier content is used to improve Google's products**. PRIVACY §6–§7 require recorded training-use terms and suitable data processing before real patient data is sent. ADR-006 limits development to synthetic data.
+- **Decision:**
+  1. The app sends audio or transcript text to the backend AI only for visits of patients marked synthetic demo (`isDemo`). The code constant is `FREE_TIER_CONTENT_USED_FOR_TRAINING` in `visitService.ts`.
+  2. Real-patient visits use on-device Android speech recognition, deterministic rule-based extraction, manual entry, and public evidence sources (clinical terms only). Temporary audio is not even captured for them.
+  3. The UI states the reason ("Cloud AI is used for synthetic demo patients only …"). Privacy and Settings disclose it.
+  4. Lifting the gate requires an owner decision: either an AI provider whose data terms exclude training and that has a data-processing agreement for the target market (this conflicts with FREE-ONLY if it is paid), or a documented free alternative with suitable terms.
+- **Consequences:** AI-assisted extraction and possibilities are demonstrable only with synthetic patients. Production AI use is BLOCKED on OD-002 plus the owner's free-only vs. data-terms decision.
+- **Future review condition:** OD-002; any change in Gemini free-tier data-use terms.
+
+## ADR-048 — V1 Development Provider Choices Under the Free-Only Rule (provisional for OD-001 / OD-002)
+
+- **Status:** PROVISIONAL (2026-10-09). The implementation from commit `c652e57` is recorded here. OD-001 and OD-002 stay OPEN for production.
+- **Decision:**
+  - **Level 1 live transcript:** the Android `SpeechRecognizer` via expo-speech-recognition, preferring on-device recognition. It is free, holds no key in the app, and the clinician tags the speaker live.
+  - **Level 2 final transcript + diarization and AI extraction/possibilities (synthetic only, ADR-047):** the Gemini free tier via Supabase Edge Functions. Keys are held server-side, `FREE_ONLY_MODE` is hard-on, and a 429 maps to QUOTA_EXHAUSTED with no retry on another model and no paid fallback.
+  - **Evidence:** keyless public APIs: RxNorm, DailyMed, openFDA, PubMed, Europe PMC, MedlinePlus, ClinicalTrials.gov, PubChem and NLM Clinical Tables. All were live-verified on 2026-10-09 (API_CATALOG §31).
+- **Consequences:** No paid provider exists anywhere in the runtime. Diarization for real patients relies on live clinician tagging plus confirmation on the Transcript screen.
+- **Future review condition:** OD-001 and OD-002 evaluations on synthetic audio (`SPEECH.md` §14, `AI.md` evaluation set).
+
+## ADR-049 — M3 Application Shell and Workflow Implementation Choices
+
+- **Status:** ACCEPTED (2026-10-09)
+- **Decision:**
+  1. **Navigation:** Expo Router, with routes in `mobile/src/app`; tabs are Home · Patients · Visits · Settings (UI-UX §2). Onboarding is enforced with `Stack.Protected`.
+  2. **Android application id:** `ai.clinnote.app`. It is provisional and may change before the first Play upload (owner).
+  3. **Permissions:** RECORD_AUDIO only. Storage, media, location, camera, contacts, phone, SMS and overlay permissions are explicitly blocked. No notification permission is requested (no notifications are implemented).
+  4. **Synthetic demo script:** demo patients can run a scripted consultation without a microphone. Its segments are tagged `demo-script`.
+  5. **Transcript correction** flags every current fact citing the segment as SOURCE_CHANGED (DATA_MODEL §3.2) and never edits facts. Re-extraction replaces untouched provisional facts only.
+  6. **Problem list:** an entry is added only by an explicit clinician action, from a CONFIRMED positive assessment or history fact, or by manual entry (§10.1).
+  7. **Export:** PDF (expo-print) or plain text through the share sheet. Draft notes carry "DRAFT — not finalized by clinician". The patient summary uses derived views only. Every export writes an AuditEvent.
+  8. **Reference images:** none are shown (no source with a verified reuse license; OD-008).
+- **Consequences:** UI-UX Screen 16 (Returning Patient) is part of the Patient Overview. Note type is chosen in the Note Editor rather than on Start Visit. Clinician sign-in (FR-28.4) is not implemented: the backend uses the public anon key and OD-004 is open.
 
 ---
 

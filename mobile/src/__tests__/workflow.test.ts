@@ -342,3 +342,24 @@ describe('offline and failure behaviour: no data loss', () => {
     expect(fever.informationState).toBe('NEGATIVE');
   });
 });
+
+describe('free-tier AI privacy gate (ADR-047)', () => {
+  test('a real (non-demo) patient visit never reaches the free-tier AI backend; rule-based extraction still works', async () => {
+    const backend = new MockBackend();
+    const runJob = jest.spyOn(backend, 'runJob');
+    const transcribe = jest.spyOn(backend, 'transcribe');
+    const store = new ClinicalStore(new MemoryFileBackend(), new DocumentCipher(rnd(32), rnd));
+    const svc = new VisitService(store, backend, new EvidenceService(store));
+    const p = await store.createPatient({ age: 50, isDemo: false });
+    const v = await store.createVisit(p.patientId, 'AMBIENT');
+    await record(svc, v, DEMO_VISIT_1);
+    const t = await svc.finalTranscription(v, settings, 'file:///synthetic.wav');
+    svc.confirmRoles(v, {});
+    const r = await svc.runExtraction(v, settings, []);
+    expect(transcribe).not.toHaveBeenCalled();
+    expect(runJob).not.toHaveBeenCalled();
+    expect(t.message).toMatch(/synthetic demo patients only/);
+    expect(r.message).toMatch(/synthetic demo patients only/);
+    expect(v.facts.some((f) => f.conceptKey === 'cough')).toBe(true);
+  });
+});

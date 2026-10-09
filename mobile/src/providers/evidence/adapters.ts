@@ -53,8 +53,12 @@ export async function rxnormNormalize(term: string): Promise<RxNormResult> {
 export async function rxnormProducts(rxcui: string): Promise<string[]> {
   const r = RxRelated.safeParse(await getJson(`https://rxnav.nlm.nih.gov/REST/rxcui/${enc(rxcui)}/related.json?tty=SCD+SBD`));
   if (!r.success) throw new ProviderError('INVALID_RESPONSE', 'RxNorm returned an unexpected response.');
-  const ids = (r.data.relatedGroup.conceptGroup ?? []).flatMap((g) => (g.conceptProperties ?? []).map((c) => c.rxcui));
-  return Array.from(new Set([rxcui, ...ids])).slice(0, 25);
+  const props = (r.data.relatedGroup.conceptGroup ?? []).flatMap((g) => g.conceptProperties ?? []);
+  // single-ingredient products first ("A 500 MG Oral Tablet"); combinations ("A / B") only fill remaining slots,
+  // otherwise combination products crowd out the ones openFDA indexes for this ingredient
+  const single = props.filter((c) => !c.name.includes(' / ')).map((c) => c.rxcui);
+  const combo = props.filter((c) => c.name.includes(' / ')).map((c) => c.rxcui);
+  return Array.from(new Set([rxcui, ...single, ...combo])).slice(0, 25);
 }
 
 // ---------------------------------------------------------------- DailyMed (labels)
@@ -83,7 +87,8 @@ export async function dailymedLabels(rxcui: string): Promise<RecordDraft[]> {
 }
 
 // ---------------------------------------------------------------- openFDA (label, Drugs@FDA, recalls)
-const rxOr = (ids: string[]) => `openfda.rxcui:(${ids.map((i) => `"${i}"`).join('+')})`;
+// explicit OR: a '+' joiner is URL-encoded to %2B and openFDA then treats the list as one term (no matches)
+const rxOr = (ids: string[]) => `openfda.rxcui:(${ids.map((i) => `"${i}"`).join(' OR ')})`;
 const FdaLabel = z.object({
   results: z.array(
     z.object({

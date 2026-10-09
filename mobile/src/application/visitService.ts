@@ -23,6 +23,11 @@ export const JOB_EXTRACTION_VERSION = 'clinical_fact_extraction@1';
 export const JOB_CANDIDATES = 'clinical_candidate_generation';
 export const JOB_CANDIDATES_VERSION = 'clinical_candidate_generation@1';
 
+/** Free-tier Gemini terms: submitted content may be used to improve the provider's products (pricing page, 2026-10-09). */
+export const FREE_TIER_CONTENT_USED_FOR_TRAINING = true as const;
+export const SYNTHETIC_ONLY_MESSAGE =
+  "Cloud AI is used for synthetic demo patients only: the free AI tier may use submitted content to improve the provider's products, so real patient transcripts are never sent to it.";
+
 export interface StageOutcome {
   ok: boolean;
   message?: string;
@@ -39,8 +44,19 @@ export class VisitService {
     v.executions.push({ executionId: newId(), job, provider, model, outcome, startedAt: new Date(started).toISOString(), durationMs: Date.now() - started });
   }
 
-  private cloudAllowed(settings: AppSettings) {
-    return settings.cloudProcessingEnabled && this.backend.configured();
+  /**
+   * Backend AI (Gemini free tier) receives transcript text/audio. The free tier's terms allow submitted content to
+   * be used to improve the provider's products (verified 2026-10-09), so it is used for synthetic demo visits only
+   * (ADR-047, PRIVACY §6–7, ADR-006). Real-patient visits use on-device speech and rule-based extraction.
+   */
+  private cloudAllowed(settings: AppSettings, v: Visit) {
+    return settings.cloudProcessingEnabled && this.backend.configured() && (v.isDemo || !FREE_TIER_CONTENT_USED_FOR_TRAINING);
+  }
+
+  private cloudReason(settings: AppSettings, v: Visit): string {
+    if (!this.backend.configured()) return USER_MESSAGES.NOT_CONFIGURED;
+    if (!settings.cloudProcessingEnabled) return 'Cloud processing is off.';
+    return SYNTHETIC_ONLY_MESSAGE;
   }
 
   // ------------------------------------------------------------- consent and recording
@@ -99,10 +115,10 @@ export class VisitService {
    */
   async finalTranscription(v: Visit, settings: AppSettings, mergedAudioUri: string | null): Promise<StageOutcome> {
     v.transcriptState = 'IN_PROGRESS';
-    if (!mergedAudioUri || !this.cloudAllowed(settings)) {
+    if (!mergedAudioUri || !this.cloudAllowed(settings, v)) {
       v.transcriptState = v.segments.length ? 'COMPLETED' : 'FAILED';
       v.transcriptSource = v.segments.length ? 'LIVE_DEVICE' : 'NONE';
-      return { ok: v.segments.length > 0, message: !this.backend.configured() ? USER_MESSAGES.NOT_CONFIGURED : !settings.cloudProcessingEnabled ? 'Cloud processing is off; the on-device live transcript is used.' : 'No recorded audio was available; the live transcript is used.' };
+      return { ok: v.segments.length > 0, message: !this.cloudAllowed(settings, v) ? `${this.cloudReason(settings, v)} The on-device live transcript is used.` : 'No recorded audio was available; the live transcript is used.' };
     }
     const started = Date.now();
     try {
@@ -169,7 +185,7 @@ export class VisitService {
     let message: string | undefined;
     let aiOk = true;
 
-    if (this.cloudAllowed(settings) && v.segments.length) {
+    if (this.cloudAllowed(settings, v) && v.segments.length) {
       const started = Date.now();
       try {
         const input = { segments: v.segments.map((s) => ({ id: s.segmentId, role: s.speakerRole, text: s.text })) };
@@ -190,6 +206,8 @@ export class VisitService {
       message = 'Rule-based extraction only (cloud AI not configured).';
     } else if (!settings.cloudProcessingEnabled) {
       message = 'Rule-based extraction only (cloud processing is off).';
+    } else if (!this.cloudAllowed(settings, v)) {
+      message = `Rule-based extraction only. ${SYNTHETIC_ONLY_MESSAGE}`;
     }
     v.facts = facts;
     v.discarded = discarded;
@@ -221,7 +239,7 @@ export class VisitService {
       v.candidateSkipReason = pre.reason;
       return { ok: false, message: pre.reason };
     }
-    if (!this.cloudAllowed(settings)) {
+    if (!this.cloudAllowed(settings, v)) {
       v.candidateState = 'SKIPPED';
       v.candidateSkipReason = 'Possibilities not generated: cloud AI unavailable.';
       return { ok: false, message: v.candidateSkipReason };

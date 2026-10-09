@@ -633,6 +633,15 @@ These must never contain real values in Git. `.env.example` lists names only.
 
 | Provider | Date verified | Documentation consulted | Confirmed details | Verified by |
 |---|---|---|---|---|
-| (none) | — | — | No provider verified as of 2026-10-08 (documentation phase) | — |
+| Google Gemini API (free tier) | 2026-10-09 | https://ai.google.dev/gemini-api/docs/pricing | Free of charge (Standard free tier): gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.5-transcribe. **Free-tier content is used to improve Google's products** → synthetic demo visits only (ADR-047). Batch/Flex/Priority not free. Live API call NOT tested (no key exists) | M3/M4 session (lead) |
+| RxNorm (rxnav.nlm.nih.gov/REST) | 2026-10-09 | live call, `rxcui.json`, `related.json?tty=SCD+SBD` | keyless; metformin → RxCUI 6809; related products returned (combination products filtered last) | `LIVE_EVIDENCE=1` jest live.test.ts |
+| DailyMed (dailymed.nlm.nih.gov/dailymed/services/v2) | 2026-10-09 | live call, `spls.json?rxcui=` | keyless; 3 SPL set IDs with drugInfo URLs | live.test.ts |
+| openFDA drug label / drugsfda / enforcement (api.fda.gov) | 2026-10-09 | live calls | keyless; label 1, Drugs@FDA 3 (ANDA numbers), recalls 3. **Bug fixed:** RxCUI lists must be joined with ` OR ` (a `+` encoded as %2B matched nothing) | live.test.ts + regression test |
+| PubMed E-utilities (eutils.ncbi.nlm.nih.gov) | 2026-10-09 | live esearch + esummary | keyless; 5 PMIDs re-resolved via esummary, pubmed.ncbi.nlm.nih.gov URLs | live.test.ts |
+| Europe PMC REST (www.ebi.ac.uk/europepmc/webservices/rest) | 2026-10-09 | live search | keyless; 5 records with europepmc.org URLs | live.test.ts |
+| MedlinePlus Web Service (wsearch.nlm.nih.gov/ws/query) | 2026-10-09 | live call | keyless; 2 topics, medlineplus.gov URLs only, attribution kept | live.test.ts |
+| ClinicalTrials.gov API v2 (clinicaltrials.gov/api/v2) | 2026-10-09 | live call | keyless; 5 NCT ids (NCT\d{8}) with study URLs; clinician-request only | live.test.ts |
+| PubChem PUG REST (pubchem.ncbi.nlm.nih.gov/rest/pug) | 2026-10-09 | live call | keyless; metformin → CID 4091; clinician-request only | live.test.ts |
+| NLM Clinical Tables (clinicaltables.nlm.nih.gov) | 2026-10-09 | live call | keyless; 6 condition suggestions for "diab" | live.test.ts |
 
 Add one row per verification. Re-verify all providers in Phase 25.

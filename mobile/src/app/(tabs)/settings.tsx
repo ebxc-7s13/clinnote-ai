@@ -59,7 +59,7 @@ export default function Settings() {
             <Chip label={cfg.url ? 'Cloud AI backend configured' : 'Cloud AI backend not configured'} tone={cfg.url ? 'success' : 'neutral'} icon={cfg.url ? 'cloud-check-outline' : 'cloud-off-outline'} />
             <Chip label={FREE_ONLY_MODE ? 'Free-only mode: no paid services or fallbacks' : 'Paid mode'} tone="info" icon="currency-usd-off" />
           </Row>
-          {!cfg.url ? <T variant="small" muted>Without a backend, live on-device transcription, rule-based extraction and public evidence sources still work when cloud processing is on.</T> : null}
+          {!cfg.url ? <T variant="small" muted>Without a backend, live on-device transcription, rule-based extraction and public evidence sources still work when cloud processing is on.</T> : <T variant="small" muted>Cloud AI (free tier) is used for synthetic demo patients only; its terms allow submitted content to improve the provider’s products.</T>}
         </Card>
       </Section>
 
